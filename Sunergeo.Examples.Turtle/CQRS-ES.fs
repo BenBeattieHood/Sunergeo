@@ -1,6 +1,11 @@
 ﻿namespace Sunergeo.Examples.Turtle
 
 open Sunergeo
+open Sunergeo.Core
+open Sunergeo.Web
+
+
+// Aggregate id, just repurposing a string for now
 
 type TurtleId = string
 

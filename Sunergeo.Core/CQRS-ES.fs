@@ -1,4 +1,4 @@
-﻿namespace Sunergeo.CqrsEs
+﻿namespace Sunergeo.Core
 
 open Sunergeo.Core
 
