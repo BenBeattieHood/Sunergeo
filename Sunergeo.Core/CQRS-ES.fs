@@ -1,7 +1,5 @@
 ﻿namespace Sunergeo.Core
 
-open Sunergeo.Core
-
 type IEvent = interface end
 
 type ICommandBase =

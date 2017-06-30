@@ -91,7 +91,5 @@ type KeyValueStore<'TValue>(config: KeyValueStorageConfig) =
         async {
             let! lockAndToken = innerLockSemaphore.Get key
             return 
-                match lockAndToken with
-                | None ->
-                    
+                () |> Result.Ok
         }

@@ -91,7 +91,7 @@ type WebHostRoutedCommand = {
 
 type WebHostConfig = {
     Logger: Microsoft.Extensions.Logging.ILogger option
-    Commands: RequestHandler list
+    Commands: WebHostRoutedCommand list
 }
 
 module WebHost =
@@ -123,7 +123,8 @@ module WebHost =
         let ctorParams = ctor.GetParameters()
 
         (fun (request: Microsoft.AspNetCore.Http.HttpRequest) ->
-            request.Path
+            // TODO: add path handler
+            None
         )
 
     let create (config: WebHostConfig): IWebHost =

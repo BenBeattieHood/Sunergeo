@@ -52,6 +52,7 @@
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="Common.fs" />
+    <Compile Include="CQRS-ES.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

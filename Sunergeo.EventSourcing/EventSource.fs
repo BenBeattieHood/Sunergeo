@@ -5,12 +5,21 @@ type EventSourceConfig = {
 }
 
 type EventSourceHead<'TState> = {
-    
+    Position: int
+    State: 'TState
 }
 
-module EventSourceModule =
-    
+type EventSourceError =
+    Timeout
+    | Disconnected
 
-type EventSource<'TState>(config: EventSourceConfig) = 
-    member this.GetHead() =
-        
+type EventSource<'TState, 'TEvents>(config: EventSourceConfig) = 
+    member this.GetHead(): Result<EventSourceHead<'TState>, EventSourceError> =
+        {
+            Position = 0
+            State = Unchecked.defaultof<'TState>
+        }
+        |> Result.Ok
+
+    member this.Add(event: 'TEvents, position: int): Result<unit, EventSourceError> =
+        () |> Result.Ok
