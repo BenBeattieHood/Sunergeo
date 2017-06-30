@@ -170,7 +170,7 @@ type CreateCommand =
             }
             |> Microsoft.FSharp.Core.Result.Ok
 
-[<Route("/turtle/turn-left")>]
+[<Route("/turtle/{_}/turn-left")>]
 type TurnLeftCommand = 
     {
         TurtleId: TurtleId
@@ -185,7 +185,7 @@ type TurnLeftCommand =
             }
             |> Microsoft.FSharp.Core.Result.Ok
             
-[<Route("/turtle/turn-right")>]
+[<Route("/turtle/{_}/turn-right")>]
 type TurnRightCommand = 
     {
         TurtleId: TurtleId
@@ -200,7 +200,7 @@ type TurnRightCommand =
             }
             |> Microsoft.FSharp.Core.Result.Ok
 
-[<Route("/turtle/go-forwards")>]
+[<Route("/turtle/{_}/go-forwards")>]
 type GoForwardsCommand = 
     {
         TurtleId: TurtleId
@@ -211,6 +211,23 @@ type GoForwardsCommand =
             seq<ITurtleEvent> {
                 yield upcast {
                     MovedForwardsEvent.TurtleId = this.TurtleId
+                } 
+            }
+            |> Microsoft.FSharp.Core.Result.Ok
+            
+[<Route("/turtle/{_}/set-visibility/{_}")>]
+type SetVisibilityCommand = 
+    {
+        TurtleId: TurtleId
+        IsVisible: bool
+    }
+    interface IUnvalidatedCommand<ITurtleEvent> with 
+        member this.GetId context = this.TurtleId
+        member this.Exec context =
+            seq<ITurtleEvent> {
+                yield upcast {
+                    VisibilityChangedEvent.TurtleId = this.TurtleId
+                    IsVisible = this.IsVisible
                 } 
             }
             |> Microsoft.FSharp.Core.Result.Ok
