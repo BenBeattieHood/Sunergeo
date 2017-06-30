@@ -92,6 +92,7 @@ type WebHostRoutedCommand = {
 type WebHostConfig = {
     Logger: Microsoft.Extensions.Logging.ILogger option
     Commands: WebHostRoutedCommand list
+    BaseUri: Uri
 }
 
 module WebHost =
