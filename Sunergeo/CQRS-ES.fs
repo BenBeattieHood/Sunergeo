@@ -1,4 +1,6 @@
-﻿namespace Sunergeo
+﻿namespace Sunergeo.CqrsEs
+
+open Sunergeo.Core
 
 type IEvent = interface end
 

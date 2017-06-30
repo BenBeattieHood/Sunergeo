@@ -5,15 +5,14 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>d99fb3dc-f1f1-43eb-92a8-71fe479df25a</ProjectGuid>
-    <OutputType>Exe</OutputType>
-    <RootNamespace>Sunergeo.Examples.Turtle</RootNamespace>
-    <AssemblyName>Sunergeo.Examples.Turtle</AssemblyName>
+    <ProjectGuid>7a2ead93-127d-4066-af91-bf528097cea9</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <RootNamespace>Sunergeo.Core</RootNamespace>
+    <AssemblyName>Sunergeo.Core</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
-    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
-    <Name>Sunergeo.Examples.Turtle</Name>
-    <TargetFrameworkProfile />
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <Name>Sunergeo.Core</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -23,9 +22,7 @@
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>bin\$(Configuration)\$(AssemblyName).XML</DocumentationFile>
-    <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -34,9 +31,7 @@
     <OutputPath>bin\$(Configuration)\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <WarningLevel>3</WarningLevel>
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DocumentationFile>bin\$(Configuration)\$(AssemblyName).XML</DocumentationFile>
-    <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
@@ -56,9 +51,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="CQRS-ES.fs" />
-    <Compile Include="Program.fs" />
-    <None Include="App.config" />
+    <Compile Include="Common.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
@@ -68,24 +61,15 @@
       <AssemblyName>FSharp.Core.dll</AssemblyName>
       <HintPath>$(MSBuildProgramFiles32)\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\$(TargetFSharpCoreVersion)\FSharp.Core.dll</HintPath>
     </Reference>
+    <Reference Include="NodaTime">
+      <HintPath>..\packages\NodaTime.2.0.3\lib\net45\NodaTime.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.ValueTuple">
       <HintPath>..\packages\System.ValueTuple.4.3.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
     </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\..\FSharpResult\FSharpResult\FSharpResult.fsproj">
-      <Name>FSharpResult</Name>
-      <Project>{d054483f-9820-45c2-b52c-dce7894583b7}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\Sunergeo\Sunergeo\Sunergeo.fsproj">
-      <Name>Sunergeo</Name>
-      <Project>{8140afb6-a2a9-4866-bef5-afd7cd841fd7}</Project>
-      <Private>True</Private>
-    </ProjectReference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
