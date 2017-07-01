@@ -1,4 +1,4 @@
-﻿namespace Sunergeo.Core
+﻿module Sunergeo.Core
 
 type UserId = string
 
@@ -16,3 +16,6 @@ type Error = {
     Status: ErrorStatus
     Message: string
 }
+
+// Marker method for quickly stubbing out methods'results
+let todo ():'T = Unchecked.defaultof<'T>

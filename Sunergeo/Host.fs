@@ -7,7 +7,9 @@ open Sunergeo.Core
 open Sunergeo.Web
 
 type Config = {
-    nothing: string
+    Logger: Microsoft.Extensions.Logging.ILogger option
+    BaseUri: Uri
+    Assemblies: Assembly list
 }
 
 module HostModule =
@@ -22,10 +24,10 @@ module HostModule =
             )
         |> Option.flatten
 
-type Host(config: Config, assemblies: Assembly[]) = 
+type Host(config: Config) = 
 
     let commands =
-        assemblies
+        config.Assemblies
         |> Seq.collect
             (fun assembly ->
                 assembly.GetTypes()
@@ -35,31 +37,39 @@ type Host(config: Config, assemblies: Assembly[]) =
                     )
             )
         |> List.ofSeq
+
+    let commandsWithRoutes =
+        commands
+        |> List.choose
+            (fun command ->
+                command 
+                |> HostModule.getAttribute<RouteAttribute>
+                |> Option.map
+                    (fun routeAttribute ->
+                        command,
+                        routeAttribute.Uri
+                    )
+            )
             
-    let config:Sunergeo.Web.WebHostConfig = {
-        Logger = None
-        BaseUri = Uri("http://localhost:8080")
+    let webHostConfig:Sunergeo.Web.WebHostConfig = {
+        Logger = config.Logger
+        BaseUri = config.BaseUri
         Commands = 
-            commands
-            |> List.choose
-                (fun command ->
-                    command 
-                    |> HostModule.getAttribute<RouteAttribute>
-                    |> Option.map
-                        (fun routeAttribute ->
-                            { 
-                                Sunergeo.Web.WebHostRoutedCommand.Path = routeAttribute.Uri
-                                CommandType = command
-                            }
-                        )
+            commandsWithRoutes
+            |> List.map
+                (fun (command, uri) ->
+                    { 
+                        Sunergeo.Web.WebHostRoutedCommand.Path = uri
+                        CommandType = command
+                    }
                 )
     }
 
-    let host = 
-        config
+    let webHost = 
+        webHostConfig
         |> Sunergeo.Web.WebHost.create
 
     interface System.IDisposable with
         member this.Dispose () =
-            host.Dispose()
+            webHost.Dispose()
             ()

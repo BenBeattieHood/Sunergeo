@@ -108,7 +108,7 @@ module WebHost =
                 (fun x ->
                     let name = 
                         if x.Value = "_" 
-                        then x.Index.ToString()
+                        then x.Index |> string
                         else x.Value
                     sprintf "(?<%s>:.+?)" name
                 )
@@ -143,5 +143,6 @@ module WebHost =
             .ConfigureServices(fun services -> services.AddSingleton<StartupConfig>(startupConfig) |> ignore)
             .UseKestrel()
             .UseStartup<Startup>()
+            .UseUrls(config.BaseUri |> string)
             .Build()
       
