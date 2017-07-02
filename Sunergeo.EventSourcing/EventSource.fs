@@ -3,53 +3,114 @@
 open Sunergeo.Core
 open Sunergeo.KeyValueStorage
 
-type EventSourceConfig<'State, 'Events> = {
-    InstanceId: InstanceId
-    Fold: 'State -> 'Events -> 'State
+type Snapshot<'State> = {
+    Position: int
+    State: 'State
 }
 
-type EventSourceHead<'State> = {
+type EventSourceConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
+    InstanceId: InstanceId
+    Fold: 'State -> 'Events -> 'State
+    SnapshotStore: Sunergeo.KeyValueStorage.KeyValueStore<'PartitionId, Snapshot<'State>>
+    LogUri: string
+}
+
+type LogEntry<'Item> = {
     Position: int
-    State: 'State option
+    Item: 'Item
 }
 
 type EventSourceError =
     Timeout
     | Disconnected
 
-type EventSource<'State, 'Events, 'Id when 'Id : comparison>(config: EventSourceConfig<'State, 'Events>) = 
-    let topicPath = 
-        sprintf "%s.%s."
+type LogConfig = {
+    Uri: string // placeholder
+    Topic: string
+}
+
+type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogConfig) =
+    
+    let mutable eventSource:Map<'PartitionId, LogEntry<'Item> seq> = Map.empty /// TODO: replace with kafka
+    let toAsync (a:'a): Async<'a> = async { return a }
+
+    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<int> =
+        async {
+            let partition =
+                eventSource
+                |> Map.tryFind partitionId
+                |> Option.defaultValue Seq.empty
+
+            let partitionLength = 
+                partition
+                |> Seq.length
+            
+            eventSource <- 
+                eventSource 
+                |> Map.add 
+                    partitionId 
+                    (
+                        partition 
+                        |> Seq.append [ { Position = partitionLength; Item = item } ]
+                    )
+
+            return partitionLength
+        }
+
+    member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<LogEntry<'Item> seq> =
+        async {
+            let result =
+                eventSource
+                |> Map.tryFind partitionId
+                |> function
+                    | Some items ->
+                        items
+                        |> Seq.skip positionId
+                    | None ->
+                        upcast [] 
+
+            return result
+        }
+
+    member this.ReadLast(partitionId: 'PartitionId): Async<LogEntry<'Item> option> =
+        async {
+            let result =
+                eventSource
+                |> Map.tryFind partitionId
+                |> Option.map
+                    (fun x -> x |> Seq.last)
+
+            return result
+        }
+        
+        
+
+type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(config: EventSourceConfig<'State, 'Events>) = 
+    let topic = 
+        sprintf "%s.%s"
             typeof<'State>.Name
             config.InstanceId |> string
 
-    let eventSource:Map<'Id, List<'Events>> = Map.empty /// TODO: replace with kafka
+    let logConfig:LogConfig = {
+        Topic = topic
+        Uri = config.LogUri
+    }
 
-    let getPartition 
-        (id:'Id)
-        :List<'Events> option =
-        eventSource
-        |> Map.tryFind id
+    let kafkaTopic = LogTopic<'PartitionId, 'Events>(logConfig)
+    
+    member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<'Events seq, EventSourceError>> = 
+        async {
+            let! entries = kafkaTopic.ReadFrom(partitionId, positionId)
 
-    member this.GetHead(id:'Id): Async<Result<EventSourceHead<'State>, EventSourceError>> =
-        async { 
             return 
-                FSharpx.Option.maybe {
-                    let! partition = getPartition id
-                    
-                    let! head =
-                        partition 
-                        |> List.tryHead
-
-                    return
-                        {
-                            Position = 0
-                            State = None
-                        }
-                        |> Result.Ok
-                }
-
+                entries 
+                |> Seq.map (fun x -> x.Item) 
+                |> Result.Ok
         }
 
-    member this.Add(event: 'Events, position: int): Result<unit, EventSourceError> =
-        () |> Result.Ok
+    member this.Add(event: 'Events, position: int):Async<Result<unit, EventSourceError>> =
+        async {
+            let! snapshot = config.SnapshotStore.BeginWrite(
+            eventSource
+            |> EventSource.getState partitionId config.Fold
+        }

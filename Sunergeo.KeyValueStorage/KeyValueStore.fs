@@ -58,7 +58,7 @@ type WriteError =
     Timeout
     | Error of string
 
-type KeyValueStore<'Value>(config: KeyValueStorageConfig) = 
+type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageConfig) = 
 
     let innerLockSemaphore = Aerospike()
     let innerStore = Aerospike()
@@ -66,18 +66,19 @@ type KeyValueStore<'Value>(config: KeyValueStorageConfig) =
     let serialize
         (value: 'a)
         : string =
-        ""
+        Sunergeo.Core.Todo.todo()
 
     let deserialize
         (serializedValue: string)
         : 'a =
-        Unchecked.defaultof<'a>
+        Sunergeo.Core.Todo.todo()
 
     member this.Get
-        (key: string)
+        (key: 'Key)
         :Async<'Value option> = 
         async {
-            let! serializedValueAndToken = innerStore.Get key
+            let serializedKey = key |> serialize
+            let! serializedValueAndToken = innerStore.Get serializedKey
             return serializedValueAndToken |> Option.map
                 (fun (serializedValue, token) ->
                     serializedValue |> deserialize
@@ -85,11 +86,11 @@ type KeyValueStore<'Value>(config: KeyValueStorageConfig) =
         }
 
     member this.BeginWrite
-        (key: string)
+        (key: 'Key)
         (value: 'Value)
         :Async<Result<unit, WriteError>> =
         async {
-            let! lockAndToken = innerLockSemaphore.Get key
-            return 
-                () |> Result.Ok
+            let serializedKey = key |> serialize
+            let! lockAndToken = innerLockSemaphore.Get serializedKey
+            return Sunergeo.Core.Todo.todo()
         }
