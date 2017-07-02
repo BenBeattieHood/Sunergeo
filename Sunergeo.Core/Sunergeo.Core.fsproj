@@ -54,6 +54,7 @@
     <Compile Include="Common.fs" />
     <Compile Include="CQRS-ES.fs" />
     <Content Include="packages.config" />
+    <Compile Include="Logging.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">

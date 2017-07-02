@@ -7,7 +7,7 @@ open Sunergeo.Core
 open Sunergeo.Web
 
 type Config = {
-    Logger: Microsoft.Extensions.Logging.ILogger option
+    Logger: Sunergeo.Logging.Logger
     BaseUri: Uri
     Assemblies: Assembly list
 }
@@ -33,7 +33,7 @@ type Host(config: Config) =
                 assembly.GetTypes()
                 |> Seq.where
                     (fun t ->
-                        t.IsAssignableFrom(typedefof<ICommand<_, _>>)
+                        t.IsAssignableFrom(typedefof<ICommand<_, _, _>>)
                     )
             )
         |> List.ofSeq

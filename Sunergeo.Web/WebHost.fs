@@ -11,7 +11,7 @@ type RequestHandler =
     Microsoft.AspNetCore.Http.HttpRequest -> (Result<unit, Error> option)
 
 type StartupConfig = {
-    Logger: Microsoft.Extensions.Logging.ILogger option
+    Logger: Sunergeo.Logging.Logger
     Handlers: RequestHandler list
 }
 
@@ -20,7 +20,7 @@ open System.Threading.Tasks
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
-open Microsoft.Extensions.Logging
+open Sunergeo.Logging
 open Microsoft.Extensions.DependencyInjection;
 
 
@@ -31,16 +31,11 @@ type Startup (config: StartupConfig) =
             app: IApplicationBuilder, 
             hosting: IHostingEnvironment
         ): unit =
-        
-        let log (level: LogLevel) (message: string): unit = 
-            match config.Logger with
-            | Some logger -> logger.Log(level, EventId(0), message, null, (fun x _ -> x))
-            | None -> ()
 
         let reqHandler (ctx: HttpContext) = 
             async {
                 sprintf "Received %O" ctx.Request.Path
-                |> log LogLevel.Information
+                |> config.Logger Sunergeo.Logging.LogLevel.Information
 
                 let result =
                     config.Handlers
@@ -54,7 +49,7 @@ type Startup (config: StartupConfig) =
                     ctx.Response.StatusCode <- StatusCodes.Status204NoContent
                     
                     sprintf "%O -> %i" ctx.Request.Path ctx.Response.StatusCode
-                    |> log LogLevel.Information
+                    |> config.Logger LogLevel.Information
 
 
                 | Some (Result.Error error) ->
@@ -67,7 +62,7 @@ type Startup (config: StartupConfig) =
                         
                     
                     sprintf "%O -> %i" ctx.Request.Path ctx.Response.StatusCode
-                    |> log LogLevel.Warning
+                    |> config.Logger LogLevel.Warning
 
                     do! ctx.Response.WriteAsync (error.Message) |> Async.AwaitTask
 
@@ -76,7 +71,7 @@ type Startup (config: StartupConfig) =
                     ctx.Response.StatusCode <- StatusCodes.Status404NotFound
 
                     sprintf "%O -> %i" ctx.Request.Path ctx.Response.StatusCode
-                    |> log LogLevel.Error
+                    |> config.Logger LogLevel.Error
 
 
             } |> Async.StartAsTask :> Task
@@ -90,7 +85,7 @@ type WebHostRoutedCommand = {
 }
 
 type WebHostConfig = {
-    Logger: Microsoft.Extensions.Logging.ILogger option
+    Logger: Sunergeo.Logging.Logger option
     Commands: WebHostRoutedCommand list
     BaseUri: Uri
 }

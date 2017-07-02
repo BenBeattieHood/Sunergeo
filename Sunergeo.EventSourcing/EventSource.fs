@@ -13,6 +13,7 @@ type EventSourceConfig<'PartitionId, 'State, 'Events when 'PartitionId : compari
     Fold: 'State -> 'Events -> 'State
     SnapshotStore: Sunergeo.KeyValueStorage.KeyValueStore<'PartitionId, Snapshot<'State>>
     LogUri: string
+    Logger: Sunergeo.Logging.Logger
 }
 
 type LogEntry<'Item> = {

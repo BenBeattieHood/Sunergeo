@@ -4,6 +4,7 @@ open System
 
 type KeyValueStorageConfig = {
     uri: string // placeholder
+    logger: Sunergeo.Logging.Logger
 }
 
 type AerospikeReadError =
