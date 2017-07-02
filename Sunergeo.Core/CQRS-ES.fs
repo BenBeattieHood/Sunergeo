@@ -5,10 +5,10 @@ type IEvent = interface end
 type ICommandBase =
     abstract GetId: Context -> string
 
-type ICommand<'TEvent, 'TState> =
+type ICommand<'Event, 'State> =
     inherit ICommandBase
-    abstract Exec: Context -> 'TState -> Microsoft.FSharp.Core.Result<'TEvent seq, Error>
+    abstract Exec: Context -> 'State -> Microsoft.FSharp.Core.Result<'Event seq, Error>
     
-type IUnvalidatedCommand<'TEvent> =
+type IUnvalidatedCommand<'Event> =
     inherit ICommandBase
-    abstract Exec: Context -> Microsoft.FSharp.Core.Result<'TEvent seq, Error>
+    abstract Exec: Context -> Microsoft.FSharp.Core.Result<'Event seq, Error>

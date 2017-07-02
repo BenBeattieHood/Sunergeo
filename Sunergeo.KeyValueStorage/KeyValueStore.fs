@@ -58,7 +58,7 @@ type WriteError =
     Timeout
     | Error of string
 
-type KeyValueStore<'TValue>(config: KeyValueStorageConfig) = 
+type KeyValueStore<'Value>(config: KeyValueStorageConfig) = 
 
     let innerLockSemaphore = Aerospike()
     let innerStore = Aerospike()
@@ -75,7 +75,7 @@ type KeyValueStore<'TValue>(config: KeyValueStorageConfig) =
 
     member this.Get
         (key: string)
-        :Async<'TValue option> = 
+        :Async<'Value option> = 
         async {
             let! serializedValueAndToken = innerStore.Get key
             return serializedValueAndToken |> Option.map
@@ -86,7 +86,7 @@ type KeyValueStore<'TValue>(config: KeyValueStorageConfig) =
 
     member this.BeginWrite
         (key: string)
-        (value: 'TValue)
+        (value: 'Value)
         :Async<Result<unit, WriteError>> =
         async {
             let! lockAndToken = innerLockSemaphore.Get key

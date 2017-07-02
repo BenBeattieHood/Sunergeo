@@ -5,14 +5,15 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>1f5a780b-974c-4e53-b513-06c73770db0f</ProjectGuid>
+    <ProjectGuid>3a965557-1bf4-47bb-acc3-c7f1125a8d6c</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Sunergeo.KeyValueStorage</RootNamespace>
-    <AssemblyName>Sunergeo.KeyValueStorage</AssemblyName>
+    <RootNamespace>Sunergeo.Projection</RootNamespace>
+    <AssemblyName>Sunergeo.Projection</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Name>Sunergeo.KeyValueStorage</Name>
+    <Name>Sunergeo.Projection</Name>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -51,12 +52,18 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="KeyValueStore.fs" />
+    <Compile Include="ProjectionHost.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="FSharp.Control.AsyncSeq">
+      <HintPath>..\packages\FSharp.Control.AsyncSeq.2.0.12\lib\net45\FSharp.Control.AsyncSeq.dll</HintPath>
+    </Reference>
     <Reference Include="FSharp.Core">
       <HintPath>..\packages\FSharp.Core.4.2.1\lib\net45\FSharp.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Kafunk">
+      <HintPath>..\packages\Kafunk.0.1.0\lib\net45\Kafunk.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
     <Reference Include="System" />
@@ -65,6 +72,13 @@
     <Reference Include="System.ValueTuple">
       <HintPath>..\packages\System.ValueTuple.4.3.1\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\FSharpResult\FSharpResult\FSharpResult.fsproj">
+      <Name>FSharpResult</Name>
+      <Project>{d054483f-9820-45c2-b52c-dce7894583b7}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

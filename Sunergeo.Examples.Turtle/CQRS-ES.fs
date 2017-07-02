@@ -117,7 +117,7 @@ module TurtleModule =
                 | _ -> 0
         }
 
-    let appendEvent
+    let fold
         (state: Turtle option)
         (event: TurtleEvent)
         : Turtle =

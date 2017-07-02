@@ -1,25 +1,55 @@
 ﻿namespace Sunergeo.EventSourcing
 
-type EventSourceConfig = {
-    uri: string // placeholder
+open Sunergeo.Core
+open Sunergeo.KeyValueStorage
+
+type EventSourceConfig<'State, 'Events> = {
+    InstanceId: InstanceId
+    Fold: 'State -> 'Events -> 'State
 }
 
-type EventSourceHead<'TState> = {
+type EventSourceHead<'State> = {
     Position: int
-    State: 'TState
+    State: 'State option
 }
 
 type EventSourceError =
     Timeout
     | Disconnected
 
-type EventSource<'TState, 'TEvents>(config: EventSourceConfig) = 
-    member this.GetHead(): Result<EventSourceHead<'TState>, EventSourceError> =
-        {
-            Position = 0
-            State = Unchecked.defaultof<'TState>
-        }
-        |> Result.Ok
+type EventSource<'State, 'Events, 'Id when 'Id : comparison>(config: EventSourceConfig<'State, 'Events>) = 
+    let topicPath = 
+        sprintf "%s.%s."
+            typeof<'State>.Name
+            config.InstanceId |> string
 
-    member this.Add(event: 'TEvents, position: int): Result<unit, EventSourceError> =
+    let eventSource:Map<'Id, List<'Events>> = Map.empty /// TODO: replace with kafka
+
+    let getPartition 
+        (id:'Id)
+        :List<'Events> option =
+        eventSource
+        |> Map.tryFind id
+
+    member this.GetHead(id:'Id): Async<Result<EventSourceHead<'State>, EventSourceError>> =
+        async { 
+            return 
+                FSharpx.Option.maybe {
+                    let! partition = getPartition id
+                    
+                    let! head =
+                        partition 
+                        |> List.tryHead
+
+                    return
+                        {
+                            Position = 0
+                            State = None
+                        }
+                        |> Result.Ok
+                }
+
+        }
+
+    member this.Add(event: 'Events, position: int): Result<unit, EventSourceError> =
         () |> Result.Ok

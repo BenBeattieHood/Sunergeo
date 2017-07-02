@@ -1,5 +1,6 @@
-﻿module Sunergeo.Core
+﻿namespace Sunergeo.Core
 
+type InstanceId = string
 type UserId = string
 
 type Context = {
@@ -17,5 +18,8 @@ type Error = {
     Message: string
 }
 
-// Marker method for quickly stubbing out methods'results
-let todo ():'T = Unchecked.defaultof<'T>
+type AsyncResult<'Ok, 'Error> = Async<Result<'Ok, 'Error>>
+
+module Todo =
+    // Marker method for quickly stubbing out methods'results
+    let todo ():'a = Unchecked.defaultof<'a>

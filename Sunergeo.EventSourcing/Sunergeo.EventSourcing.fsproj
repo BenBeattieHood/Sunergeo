@@ -55,18 +55,36 @@
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="mscorlib" />
-    <Reference Include="FSharp.Core">
-      <Name>FSharp.Core</Name>
-      <AssemblyName>FSharp.Core.dll</AssemblyName>
-      <HintPath>$(MSBuildProgramFiles32)\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\$(TargetFSharpCoreVersion)\FSharp.Core.dll</HintPath>
+    <Reference Include="FSharp.Control.AsyncSeq">
+      <HintPath>..\packages\FSharp.Control.AsyncSeq.2.0.12\lib\net45\FSharp.Control.AsyncSeq.dll</HintPath>
     </Reference>
+    <Reference Include="FSharp.Core">
+      <HintPath>..\packages\FSharp.Core.4.2.1\lib\net45\FSharp.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="FSharpx.Async">
+      <HintPath>..\packages\FSharpx.Async.1.13.2\lib\net45\FSharpx.Async.dll</HintPath>
+    </Reference>
+    <Reference Include="FSharpx.Collections">
+      <HintPath>..\packages\FSharpx.Collections.1.17.0\lib\net40\FSharpx.Collections.dll</HintPath>
+    </Reference>
+    <Reference Include="FSharpx.Extras">
+      <HintPath>..\packages\FSharpx.Extras.2.2.1\lib\net45\FSharpx.Extras.dll</HintPath>
+    </Reference>
+    <Reference Include="Kafunk">
+      <HintPath>..\packages\Kafunk.0.1.0\lib\net45\Kafunk.dll</HintPath>
+    </Reference>
+    <Reference Include="mscorlib" />
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
     <Reference Include="System.ValueTuple">
       <HintPath>..\packages\System.ValueTuple.4.3.1\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
     </Reference>
+    <ProjectReference Include="..\Sunergeo.Core\Sunergeo.Core.fsproj">
+      <Name>Sunergeo.Core</Name>
+      <Project>{7a2ead93-127d-4066-af91-bf528097cea9}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Sunergeo.KeyValueStorage\Sunergeo.KeyValueStorage.fsproj">
       <Name>Sunergeo.KeyValueStorage</Name>
       <Project>{1f5a780b-974c-4e53-b513-06c73770db0f}</Project>
