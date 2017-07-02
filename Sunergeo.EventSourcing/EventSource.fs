@@ -98,11 +98,18 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
 
     let kafkaTopic = LogTopic<'PartitionId, 'Events>(logConfig)
 
-    let addWith
-        (stateAndVersion: ('Value * KeyValueVersion) option)
-        :Async<unit> =
+    let rec exec
+        (partitionId: 'PartitionId)
+        (context: Context) 
+        (command: ICommand<'PartitionId, 'Events, 'State>)
+        :Async<Result<unit, EventSourceError>> =
+
+        let asd = command.Exec context 
+
         async {
-            return ()
+            let! snapshot = config.SnapshotStore.Get partitionId
+
+            return Result.
         }
     
     member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<'Events seq, EventSourceError>> = 
@@ -115,9 +122,12 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
                 |> Result.Ok
         }
 
-    member this.Add(partitionId: 'PartitionId, event: 'Events, position: int):Async<Result<unit, EventSourceError>> =
+    member this.Exec(context: Context, command: ICommand<'PartitionId, 'Events, 'State>):Async<Result<unit, EventSourceError>> =
         async {
-            let! snapshot = config.SnapshotStore.Get partitionId
+            let partitionId = 
+                context
+                |> command.GetId 
+
             return 
                 ResultModule.bimap
                     (fun stateAndVersion ->
