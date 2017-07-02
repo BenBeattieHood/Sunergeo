@@ -12,38 +12,36 @@ type TurtleId = string
 
 // Events
 
-type ITurtleEvent = IEvent
-
 type CreatedEvent = 
     {
         TurtleId: TurtleId
     }
-    interface ITurtleEvent
+    interface IEvent
 
 type TurnedLeftEvent = 
     {
         TurtleId: TurtleId
     }
-    interface ITurtleEvent
+    interface IEvent
     
 type TurnedRightEvent = 
     {
         TurtleId: TurtleId
     }
-    interface ITurtleEvent
+    interface IEvent
     
 type MovedForwardsEvent = 
     {
         TurtleId: TurtleId
     }
-    interface ITurtleEvent
+    interface IEvent
     
-type VisibilityChangedEvent = 
+type VisibilitySetEvent = 
     {
         TurtleId: TurtleId
         IsVisible: bool
     }
-    interface ITurtleEvent
+    interface IEvent
 
 // Events DU
 
@@ -52,7 +50,7 @@ type TurtleEvent =
     | TurnedLeft of TurnedLeftEvent
     | TurnedRight of TurnedRightEvent
     | MovedForwards of MovedForwardsEvent
-    | VisibilityChanged of VisibilityChangedEvent
+    | VisibilitySet of VisibilitySetEvent
 
 // State
 
@@ -145,7 +143,7 @@ module TurtleModule =
                 { state with
                     Position = (state.Position, state.Direction) |> move
                 }
-            | VisibilityChanged event ->
+            | VisibilitySet event ->
                 { state with
                     IsVisible = event.IsVisible
                 }
@@ -160,13 +158,13 @@ type CreateCommand =
         [<GeneratedId()>] 
         TurtleId: TurtleId
     }
-    interface IUnvalidatedCommand<ITurtleEvent> with 
+    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context =
-            seq<ITurtleEvent> {
-                yield upcast {
-                    TurnedLeftEvent.TurtleId = this.TurtleId
-                } 
+            seq {
+                yield {
+                    CreatedEvent.TurtleId = this.TurtleId
+                } |> TurtleEvent.Created
             }
             |> Microsoft.FSharp.Core.Result.Ok
 
@@ -175,13 +173,13 @@ type TurnLeftCommand =
     {
         TurtleId: TurtleId
     }
-    interface IUnvalidatedCommand<ITurtleEvent> with 
+    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context =
-            seq<ITurtleEvent> {
-                yield upcast {
+            seq {
+                yield {
                     TurnedLeftEvent.TurtleId = this.TurtleId
-                } 
+                } |> TurtleEvent.TurnedLeft
             }
             |> Microsoft.FSharp.Core.Result.Ok
             
@@ -190,13 +188,13 @@ type TurnRightCommand =
     {
         TurtleId: TurtleId
     }
-    interface IUnvalidatedCommand<ITurtleEvent> with 
+    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context =
-            seq<ITurtleEvent> {
-                yield upcast {
-                    TurnedLeftEvent.TurtleId = this.TurtleId
-                } 
+            seq {
+                yield {
+                    TurnedRightEvent.TurtleId = this.TurtleId
+                } |> TurtleEvent.TurnedRight
             }
             |> Microsoft.FSharp.Core.Result.Ok
 
@@ -205,13 +203,13 @@ type GoForwardsCommand =
     {
         TurtleId: TurtleId
     }
-    interface IUnvalidatedCommand<ITurtleEvent> with 
+    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context =
-            seq<ITurtleEvent> {
-                yield upcast {
+            seq {
+                yield {
                     MovedForwardsEvent.TurtleId = this.TurtleId
-                } 
+                } |> TurtleEvent.MovedForwards
             }
             |> Microsoft.FSharp.Core.Result.Ok
             
@@ -221,13 +219,13 @@ type SetVisibilityCommand =
         TurtleId: TurtleId
         IsVisible: bool
     }
-    interface IUnvalidatedCommand<ITurtleEvent> with 
+    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context =
-            seq<ITurtleEvent> {
-                yield upcast {
-                    VisibilityChangedEvent.TurtleId = this.TurtleId
+            seq {
+                yield {
+                    VisibilitySetEvent.TurtleId = this.TurtleId
                     IsVisible = this.IsVisible
-                } 
+                } |> TurtleEvent.VisibilitySet
             }
             |> Microsoft.FSharp.Core.Result.Ok

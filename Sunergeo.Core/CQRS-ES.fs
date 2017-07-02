@@ -2,13 +2,17 @@
 
 type IEvent = interface end
 
-type ICommandBase =
-    abstract GetId: Context -> string
+type ICommandBase<'Id when 'Id : comparison> =
+    abstract GetId: Context -> 'Id
+    
+type ICreateCommand<'Id, 'Event when 'Id : comparison> =
+    inherit ICommandBase<'Id>
+    abstract Exec: Context -> Microsoft.FSharp.Core.Result<'Event seq, Error>
 
-type ICommand<'Event, 'State> =
-    inherit ICommandBase
+type ICommand<'Id, 'Event, 'State when 'Id : comparison> =
+    inherit ICommandBase<'Id>
     abstract Exec: Context -> 'State -> Microsoft.FSharp.Core.Result<'Event seq, Error>
     
-type IUnvalidatedCommand<'Event> =
-    inherit ICommandBase
+type IUnvalidatedCommand<'Id, 'Event when 'Id : comparison> =
+    inherit ICommandBase<'Id>
     abstract Exec: Context -> Microsoft.FSharp.Core.Result<'Event seq, Error>

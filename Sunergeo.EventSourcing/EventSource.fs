@@ -85,7 +85,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
         
         
 
-type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(config: EventSourceConfig<'State, 'Events>) = 
+type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(config: EventSourceConfig<'PartitionId, 'State, 'Events>) = 
     let topic = 
         sprintf "%s.%s"
             typeof<'State>.Name
@@ -97,6 +97,13 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
     }
 
     let kafkaTopic = LogTopic<'PartitionId, 'Events>(logConfig)
+
+    let addWith
+        (stateAndVersion: ('Value * KeyValueVersion) option)
+        :Async<unit> =
+        async {
+            return ()
+        }
     
     member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<'Events seq, EventSourceError>> = 
         async {
@@ -108,9 +115,15 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
                 |> Result.Ok
         }
 
-    member this.Add(event: 'Events, position: int):Async<Result<unit, EventSourceError>> =
+    member this.Add(partitionId: 'PartitionId, event: 'Events, position: int):Async<Result<unit, EventSourceError>> =
         async {
-            let! snapshot = config.SnapshotStore.BeginWrite(
-            eventSource
-            |> EventSource.getState partitionId config.Fold
+            let! snapshot = config.SnapshotStore.Get partitionId
+            return 
+                ResultModule.bimap
+                    (fun stateAndVersion ->
+                        ()
+                    )
+                    (fun error ->
+                        Sunergeo.Core.Todo.todo()
+                    )
         }
