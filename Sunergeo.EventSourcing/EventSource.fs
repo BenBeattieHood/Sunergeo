@@ -140,10 +140,15 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
             failwith "Unrecognised command type"
 
     let folder 
-        (asyncResult: Async<Result<int, LogError>> option)
+        (asyncResult: Result<int, LogError> option)
         (event: 'Events)
-        : Async<Result<int, LogError>> option =
-        
+        : Result<int, LogError> option =
+        let partitionId = Unchecked.defaultof<'PartitionId>
+        let asd = 
+
+        let sdf =
+            
+            //|> Some
         Sunergeo.Core.Todo.todo()
 
     let rec exec
@@ -170,22 +175,22 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
                                 async {
                                     //do! kafkaTopic.BeginTransaction()
                                     
-
-                                    let asd = 
+                                    let result = 
                                         events
                                         |> Seq.fold
                                             (fun result event ->
-                                                result
-                                                |> Option.defaultValue (async { return (-1 |> Result.Ok) })
-                                                |> Async.RunSynchronously
-                                                |> ResultModule.bimap
-                                                    (fun _ -> 
+                                                ResultModule.result {
+                                                    let! _ = 
+                                                        result
+                                                        |> Option.defaultValue (-1 |> Result.Ok)
+                                                    return!
                                                         kafkaTopic.Add(partitionId, event) 
-                                                    )
-                                                    id
+                                                        |> Async.RunSynchronously
+                                                }
                                                 |> Some
                                             )
                                             None
+                                    
 
                                     for event in events do
                                         let! asd = kafkaTopic.Add(partitionId, event)
