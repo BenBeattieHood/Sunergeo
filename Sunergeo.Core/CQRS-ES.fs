@@ -7,12 +7,12 @@ type ICommandBase<'Id when 'Id : comparison> =
     
 type ICreateCommand<'Id, 'Event when 'Id : comparison> =
     inherit ICommandBase<'Id>
-    abstract Exec: Context -> Microsoft.FSharp.Core.Result<'Event seq, Error>
+    abstract Exec: Context -> Result<'Event seq, Error>
 
 type ICommand<'Id, 'Event, 'State when 'Id : comparison> =
     inherit ICommandBase<'Id>
-    abstract Exec: Context -> 'State -> Microsoft.FSharp.Core.Result<'Event seq, Error>
+    abstract Exec: Context -> 'State -> Result<'Event seq, Error>
     
 type IUnvalidatedCommand<'Id, 'Event when 'Id : comparison> =
     inherit ICommandBase<'Id>
-    abstract Exec: Context -> Microsoft.FSharp.Core.Result<'Event seq, Error>
+    abstract Exec: Context -> Result<'Event seq, Error>
