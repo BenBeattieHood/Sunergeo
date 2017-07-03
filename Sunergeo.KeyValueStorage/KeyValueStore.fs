@@ -120,8 +120,8 @@ type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageC
 
     member this.Put
         (key: 'Key)
-        (value: 'Value)
         (version: KeyValueVersion option)
+        (value: 'Value)
         :Async<Result<unit, WriteError>> =
         async {
             let serializedKey = key |> serialize

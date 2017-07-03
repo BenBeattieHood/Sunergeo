@@ -38,22 +38,22 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
     let toAsync (a:'a): Async<'a> = async { return a }
 
     // https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/
-    member this.BeginTransaction(): Async<Result<LogTransactionId, LogError>> =
+    member this.BeginTransaction(): Async<LogTransactionId> =
         async {
-            return ("" : LogTransactionId) |> Result.Ok
+            return ("" : LogTransactionId)
         }
 
-    member this.AbortTransaction(): Async<Result<unit, LogError>> =
-        async {
-            return Sunergeo.Core.Todo.todo()
-        }
-
-    member this.CommitTransaction(): Async<Result<unit, LogError>> =
+    member this.AbortTransaction(): Async<unit> =
         async {
             return Sunergeo.Core.Todo.todo()
         }
 
-    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int, LogError>> =
+    member this.CommitTransaction(): Async<unit> =
+        async {
+            return Sunergeo.Core.Todo.todo()
+        }
+
+    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<int> =
         async {
             let partition =
                 eventSource
@@ -76,7 +76,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             return partitionLength |> Result.Ok
         }
 
-    member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<LogEntry<'Item> seq, LogError>> =
+    member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<LogEntry<'Item> seq> =
         async {
             let result =
                 eventSource
@@ -91,7 +91,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             return result |> Result.Ok
         }
 
-    member this.ReadLast(partitionId: 'PartitionId): Async<Result<LogEntry<'Item> option, LogError>> =
+    member this.ReadLast(partitionId: 'PartitionId): Async<LogEntry<'Item> option> =
         async {
             let result =
                 eventSource
@@ -139,17 +139,34 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
         | _ ->
             failwith "Unrecognised command type"
 
-    let folder 
-        (asyncResult: Result<int, LogError> option)
-        (event: 'Events)
-        : Result<int, LogError> option =
-        let partitionId = Unchecked.defaultof<'PartitionId>
-        let asd = 
+    let writeEventsToLog
+        (partitionId: 'PartitionId)
+        (events: 'Events seq)
+        :Async<unit> =
+        async {
+            let! transactionId = kafkaTopic.BeginTransaction()
 
-        let sdf =
-            
-            //|> Some
-        Sunergeo.Core.Todo.todo()
+            try
+                let mutable result:int option = None
+
+                for event in events do
+                    let! positionId = kafkaTopic.Add(partitionId, event) 
+                    result <- positionId |> Some
+
+                let! snapshotPutResult =
+                    config.SnapshotStore.Put
+                        partitionId
+                        state
+                        version
+
+                do snapshotPutResult |> ResultModule.get
+
+                do! kafkaTopic.CommitTransaction()
+            with
+                | :? _ as ex ->
+                    do! kafkaTopic.AbortTransaction()
+                    raise ex
+        }
 
     let rec exec
         (partitionId: 'PartitionId)
@@ -169,43 +186,39 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
                         ResultModule.result {
                             let! events = commandWrapper (snapshot.State |> Some)
                             
-                            let state = foldWrapper (snapshot.State |> Some)
+                            let state = 
+                                foldWrapper 
+                                    (snapshot.State |> Some)
+                                    events
+
+                            async {
+                                try 
+                                    do! writeEventsToLog
+                                        partitionId
+                                        events
+
+                                    
+                                with
+                                
+                            }
 
                             return 
-                                async {
-                                    //do! kafkaTopic.BeginTransaction()
-                                    
-                                    let result = 
-                                        events
-                                        |> Seq.fold
-                                            (fun result event ->
-                                                ResultModule.result {
-                                                    let! _ = 
-                                                        result
-                                                        |> Option.defaultValue (-1 |> Result.Ok)
-                                                    return!
-                                                        kafkaTopic.Add(partitionId, event) 
-                                                        |> Async.RunSynchronously
-                                                }
-                                                |> Some
-                                            )
-                                            None
-                                    
-
-                                    for event in events do
-                                        let! asd = kafkaTopic.Add(partitionId, event)
-                                        ()
                                       
-                                    config.SnapshotStore.Put
-                                        partitionId
-                                        state
-                                        version
-                                }
+                                    let!
+                                        config.SnapshotStore.Put
+                                            partitionId
+                                            state
+                                            version
                         }
 
                     | None -> 
                         ResultModule.result {
                             let! events = commandWrapper None
+                            let state = 
+                                foldWrapper
+                                    (snapshot.State |> Some) 
+                                    events
+
                             return ()
                         }
 
