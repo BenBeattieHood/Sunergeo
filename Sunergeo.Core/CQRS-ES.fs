@@ -1,18 +1,16 @@
 ﻿namespace Sunergeo.Core
 
 type IEvent = interface end
+type ICreatedEvent = 
+    inherit IEvent
 
 type ICommandBase<'Id when 'Id : comparison> =
     abstract GetId: Context -> 'Id
     
-type ICreateCommand<'Id, 'Event when 'Id : comparison> =
+type ICreateCommand<'Id, 'State, 'Event when 'Id : comparison> =
     inherit ICommandBase<'Id>
-    abstract Exec: Context -> Result<'Event seq, Error>
+    abstract Exec: Context -> Result<'State * ('Event seq), Error>
 
-type ICommand<'Id, 'Event, 'State when 'Id : comparison> =
+type ICommand<'Id, 'State, 'Event when 'Id : comparison> =
     inherit ICommandBase<'Id>
     abstract Exec: Context -> 'State -> Result<'Event seq, Error>
-    
-type IUnvalidatedCommand<'Id, 'Event when 'Id : comparison> =
-    inherit ICommandBase<'Id>
-    abstract Exec: Context -> Result<'Event seq, Error>

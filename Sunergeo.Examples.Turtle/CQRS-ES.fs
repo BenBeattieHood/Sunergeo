@@ -12,12 +12,6 @@ type TurtleId = string
 
 // Events
 
-type CreatedEvent = 
-    {
-        TurtleId: TurtleId
-    }
-    interface IEvent
-
 type TurnedLeftEvent = 
     {
         TurtleId: TurtleId
@@ -46,7 +40,6 @@ type VisibilitySetEvent =
 // Events DU
 
 type TurtleEvent =
-    | Created of CreatedEvent
     | TurnedLeft of TurnedLeftEvent
     | TurnedRight of TurnedRightEvent
     | MovedForwards of MovedForwardsEvent
@@ -74,7 +67,8 @@ type Turtle = {
 
 // Events -> State
 
-module TurtleModule =
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Turtle =
     let turnRight
         (direction:Direction)
         :Direction =
@@ -115,39 +109,38 @@ module TurtleModule =
                 | _ -> 0
         }
 
+    let create
+        (context: Context)
+        (turtleId: TurtleId)
+        : Turtle =
+        {
+            TurtleId = turtleId
+            Direction = Direction.North
+            Position = { X = 0; Y = 0 }
+            IsVisible = true
+        }
+
     let fold
-        (state: Turtle option)
+        (state: Turtle)
         (event: TurtleEvent)
         : Turtle =
-        match event, state with
-        | Created event, None ->
-            {
-                TurtleId = event.TurtleId
-                Direction = Direction.North
-                Position = { X = 0; Y = 0 }
-                IsVisible = true
+        match event with
+        | TurnedLeft event ->
+            { state with
+                Direction = state.Direction |> turnLeft
             }
-        | _, Some state ->
-            match event with
-            | Created _ -> 
-                failwith "Invalid case"
-            | TurnedLeft event ->
-                { state with
-                    Direction = state.Direction |> turnLeft
-                }
-            | TurnedRight event ->
-                { state with
-                    Direction = state.Direction |> turnRight
-                }
-            | MovedForwards event ->
-                { state with
-                    Position = (state.Position, state.Direction) |> move
-                }
-            | VisibilitySet event ->
-                { state with
-                    IsVisible = event.IsVisible
-                }
-        | _, None -> failwith "Invalid case"
+        | TurnedRight event ->
+            { state with
+                Direction = state.Direction |> turnRight
+            }
+        | MovedForwards event ->
+            { state with
+                Position = (state.Position, state.Direction) |> move
+            }
+        | VisibilitySet event ->
+            { state with
+                IsVisible = event.IsVisible
+            }
 
 
 // Commands
@@ -158,14 +151,13 @@ type CreateCommand =
         [<GeneratedId()>] 
         TurtleId: TurtleId
     }
-    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
+    interface ICreateCommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context =
-            seq {
-                yield {
-                    CreatedEvent.TurtleId = this.TurtleId
-                } |> TurtleEvent.Created
-            }
+            (
+                this.TurtleId |> Turtle.create context,
+                Seq.empty
+            )
             |> Result.Ok
 
 [<Route("/turtle/{_}/turn-left")>]
@@ -173,9 +165,9 @@ type TurnLeftCommand =
     {
         TurtleId: TurtleId
     }
-    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
+    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
-        member this.Exec context =
+        member this.Exec context _ =
             seq {
                 yield {
                     TurnedLeftEvent.TurtleId = this.TurtleId
@@ -188,9 +180,9 @@ type TurnRightCommand =
     {
         TurtleId: TurtleId
     }
-    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
+    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
-        member this.Exec context =
+        member this.Exec context _ =
             seq {
                 yield {
                     TurnedRightEvent.TurtleId = this.TurtleId
@@ -203,15 +195,31 @@ type GoForwardsCommand =
     {
         TurtleId: TurtleId
     }
-    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
+    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
-        member this.Exec context =
-            seq {
-                yield {
-                    MovedForwardsEvent.TurtleId = this.TurtleId
-                } |> TurtleEvent.MovedForwards
-            }
-            |> Result.Ok
+        member this.Exec context _ =
+            let min, max = -100, 100
+
+            let canMoveForwards =
+                match (state.Position.X, state.Position.Y, state.Direction) with
+                | (_, max, Direction.North) -> false
+                | max, _, Direction.East -> false
+                | _, min, Direction.South -> false
+                | min, _, Direction.West -> false
+                | _ -> true
+                
+            if canMoveForwards 
+            then
+                seq {
+                    yield {
+                        MovedForwardsEvent.TurtleId = this.TurtleId
+                    } |> TurtleEvent.MovedForwards
+                }
+                |> Result.Ok
+            else
+                "Turtle would move outside boundary"
+                |> Error.InvalidOp
+                |> Result.Error
             
 [<Route("/turtle/{_}/set-visibility/{_}")>]
 type SetVisibilityCommand = 
@@ -219,9 +227,9 @@ type SetVisibilityCommand =
         TurtleId: TurtleId
         IsVisible: bool
     }
-    interface IUnvalidatedCommand<TurtleId, TurtleEvent> with 
+    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
-        member this.Exec context =
+        member this.Exec context _ =
             seq {
                 yield {
                     VisibilitySetEvent.TurtleId = this.TurtleId
