@@ -166,7 +166,7 @@ type CreateCommand =
                     CreatedEvent.TurtleId = this.TurtleId
                 } |> TurtleEvent.Created
             }
-            |> Microsoft.FSharp.Core.Result.Ok
+            |> Result.Ok
 
 [<Route("/turtle/{_}/turn-left")>]
 type TurnLeftCommand = 
@@ -181,7 +181,7 @@ type TurnLeftCommand =
                     TurnedLeftEvent.TurtleId = this.TurtleId
                 } |> TurtleEvent.TurnedLeft
             }
-            |> Microsoft.FSharp.Core.Result.Ok
+            |> Result.Ok
             
 [<Route("/turtle/{_}/turn-right")>]
 type TurnRightCommand = 
@@ -196,7 +196,7 @@ type TurnRightCommand =
                     TurnedRightEvent.TurtleId = this.TurtleId
                 } |> TurtleEvent.TurnedRight
             }
-            |> Microsoft.FSharp.Core.Result.Ok
+            |> Result.Ok
 
 [<Route("/turtle/{_}/go-forwards")>]
 type GoForwardsCommand = 
@@ -211,7 +211,7 @@ type GoForwardsCommand =
                     MovedForwardsEvent.TurtleId = this.TurtleId
                 } |> TurtleEvent.MovedForwards
             }
-            |> Microsoft.FSharp.Core.Result.Ok
+            |> Result.Ok
             
 [<Route("/turtle/{_}/set-visibility/{_}")>]
 type SetVisibilityCommand = 
@@ -228,4 +228,4 @@ type SetVisibilityCommand =
                     IsVisible = this.IsVisible
                 } |> TurtleEvent.VisibilitySet
             }
-            |> Microsoft.FSharp.Core.Result.Ok
+            |> Result.Ok
