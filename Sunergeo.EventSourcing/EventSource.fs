@@ -53,7 +53,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             return Sunergeo.Core.Todo.todo()
         }
 
-    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<int> =
+    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int, LogError>> =
         async {
             let partition =
                 eventSource
@@ -76,7 +76,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             return partitionLength |> Result.Ok
         }
 
-    member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<LogEntry<'Item> seq> =
+    member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<LogEntry<'Item> seq, LogError>> =
         async {
             let result =
                 eventSource
@@ -91,7 +91,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             return result |> Result.Ok
         }
 
-    member this.ReadLast(partitionId: 'PartitionId): Async<LogEntry<'Item> option> =
+    member this.ReadLast(partitionId: 'PartitionId): Async<Result<LogEntry<'Item> option, LogError>> =
         async {
             let result =
                 eventSource
@@ -116,151 +116,94 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
     }
 
     let kafkaTopic = LogTopic<'PartitionId, 'Events>(logConfig)
-
-    let createCommandWrapper
-        (context: Context)
+    
+    let rec exec
+        (context: Context) 
+        (fold: 'State -> ('Events seq) -> 'State)
         (command: ICommandBase<'PartitionId>)
-        : ('State option -> Result<'Events seq, Error>) =
-
-        match command with
-        | :? ICreateCommand<'PartitionId, 'Events> as createCommand ->
-            function
-            | None -> createCommand.Exec context
-            | Some state -> failwith "Create command must have empty state"
-
-        | :? ICommand<'PartitionId, 'Events, 'State> as command ->
-            function
-            | Some state -> command.Exec context state
-            | None -> failwith "Command must have state"
-
-        | :? IUnvalidatedCommand<'PartitionId, 'Events> as unvalidatedCommand ->
-            (fun _ -> unvalidatedCommand.Exec context)
-
-        | _ ->
-            failwith "Unrecognised command type"
-
-    let writeEventsToLog
-        (partitionId: 'PartitionId)
-        (events: 'Events seq)
-        :Async<unit> =
+        :Async<Result<unit, Error>> =
+        
         async {
-            let! transactionId = kafkaTopic.BeginTransaction()
+            let partitionId = command.GetId context
+            let! snapshotAndVersionResult = config.SnapshotStore.Get partitionId
 
+            let snapshotAndVersion =
+                snapshotAndVersionResult
+                |> ResultModule.get
+                
+            let newState, events, version =
+                match command, snapshotAndVersion with
+                | :? ICreateCommand<'PartitionId, 'State, 'Events> as createCommand, None ->
+                    let newState, events = 
+                        createCommand.Exec context 
+                        |> ResultModule.get
+
+                    newState, events, None
+                | :? ICommand<'PartitionId, 'State, 'Events> as command, Some (snapshot, version) ->
+                    let events = 
+                        snapshot.State
+                        |> command.Exec context
+                        |> ResultModule.get
+
+                    let newState = 
+                        events
+                        |> fold snapshot.State
+
+                    newState, events, (version |> Some)
+                | _ ->
+                    failwith "uhoh"
+                    
+                    
+            let! transactionId = kafkaTopic.BeginTransaction()
+            
             try
-                let mutable result:int option = None
+                let mutable position:int option = None
 
                 for event in events do
-                    let! positionId = kafkaTopic.Add(partitionId, event) 
-                    result <- positionId |> Some
+                    let! positionResult = kafkaTopic.Add(partitionId, event) 
+                    position <- (positionResult |> ResultModule.get |> Some)
+                    
+                match position with
+                | Some position ->
+                    let snapshot = {
+                        Snapshot.Position = position
+                        Snapshot.State = newState
+                    }
 
-                let! snapshotPutResult =
-                    config.SnapshotStore.Put
-                        partitionId
-                        state
-                        version
+                    let snapshotOverVersion = (snapshot |> Some, version)
 
-                do snapshotPutResult |> ResultModule.get
+                    let! snapshotPutResult =
+                        config.SnapshotStore.Put
+                            partitionId
+                            snapshotOverVersion
 
-                do! kafkaTopic.CommitTransaction()
+                    do snapshotPutResult |> ResultModule.get
+
+                    do! kafkaTopic.CommitTransaction()
+
+                | None ->
+                    do! kafkaTopic.AbortTransaction()
+
+                return () |> Result.Ok
             with
                 | :? _ as ex ->
                     do! kafkaTopic.AbortTransaction()
-                    raise ex
-        }
+                    return Sunergeo.Core.Todo.todo()
 
-    let rec exec
-        (partitionId: 'PartitionId)
-        (context: Context) 
-        (commandWrapper: ('State option) -> Result<'Events seq, Error>)
-        (foldWrapper: ('State option) -> ('Events seq) -> 'State)
-        :Async<Result<unit, Error>> =
-
-        let execWithSnapshot
-            (snapshotAndVersion: (Snapshot<'State> * KeyValueVersion) option)
-            :Async<Result<unit, Error>> =
-            async {
-                //let (position, state, version)
-                let events =
-                    match snapshotAndVersion with
-                    | Some (snapshot, version) ->
-                        ResultModule.result {
-                            let! events = commandWrapper (snapshot.State |> Some)
-                            
-                            let state = 
-                                foldWrapper 
-                                    (snapshot.State |> Some)
-                                    events
-
-                            async {
-                                try 
-                                    do! writeEventsToLog
-                                        partitionId
-                                        events
-
-                                    
-                                with
-                                
-                            }
-
-                            return 
-                                      
-                                    let!
-                                        config.SnapshotStore.Put
-                                            partitionId
-                                            state
-                                            version
-                        }
-
-                    | None -> 
-                        ResultModule.result {
-                            let! events = commandWrapper None
-                            let state = 
-                                foldWrapper
-                                    (snapshot.State |> Some) 
-                                    events
-
-                            return ()
-                        }
-
-                return () |> Result.Ok
-            }
-
-        let asd = command.Exec context 
-
-        async {
-            let! snapshotAndVersionResult = config.SnapshotStore.Get partitionId
-
-            let asd =
-                snapshotAndVersionResult
-                |> ResultModule.bimap
-                    execWithSnapshot
-                    (fun x -> Sunergeo.Core.Todo.todo())
-
-            return Sunergeo.Core.Todo.todo()
+                  
         }
     
-    //member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<'Events seq, EventSourceError>> = 
-    //    async {
-    //        let! entries = kafkaTopic.ReadFrom(partitionId, positionId)
-
-    //        return 
-    //            entries 
-    //            |> Seq.map (fun x -> x.Item) 
-    //            |> Result.Ok
-    //    }
-
-    member this.Exec(context: Context, command: ICommandBase<'PartitionId>):Async<Result<unit, Error>> =
+    member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<'Events seq, Error>> = 
         async {
-            let partitionId = 
-                context
-                |> command.GetId 
+            let! entries = kafkaTopic.ReadFrom(partitionId, positionId)
 
             return 
-                ResultModule.bimap
-                    (fun stateAndVersion ->
-                        ()
-                    )
-                    (fun error ->
-                        Sunergeo.Core.Todo.todo()
-                    )
+                entries 
+                |> ResultModule.bimap
+                    (Seq.map (fun x -> x.Item))
+                    (fun x -> Sunergeo.Core.Todo.todo())
         }
+
+    member this.Exec(context: Context, command: ICommandBase<'PartitionId>, fold: 'State -> ('Events seq) -> 'State):Async<Result<unit, Error>> =
+        command
+        |> exec context fold
