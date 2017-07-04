@@ -1,9 +1,11 @@
 ﻿namespace Sunergeo.KeyValueStorage
 
 open System
+open Aerospike.Client
 
 type KeyValueStorageConfig = {
     uri: string // placeholder
+    port: int
     logger: Sunergeo.Logging.Logger
 }
 
@@ -14,57 +16,70 @@ type AerospikeReadError =
 type AerospikeWriteError =
     Timeout
     | InvalidVersion
-    | Error of string
+    | Error of String
 
 
 // This type is just a placeholder to represent the approx API offered by Aerospike. A TL;DR of write versions is here https://discuss.aerospike.com/t/locking-a-record-in-aerospike/2152/3
-type KeyValueVersion = Guid
-type Aerospike() =
-
-    let mutable innerLockSemaphore:Map<string, KeyValueVersion> = Map.empty
-    let mutable innerStore:Map<string, string> = Map.empty
+type Aerospike(config: KeyValueStorageConfig) =
+   
+    let valueColumnName = "value"
+    
+    let client = new AerospikeClient(config.uri, config.port)
 
     member this.Get
         (
             key: string
         )
-        :Async<Result<(string * KeyValueVersion) option, AerospikeReadError>> =
-        async {
-            return lock 
-                innerStore
-                (fun _ ->
-                    innerStore
-                    |> Map.tryFind key
-                    |> Option.map
-                        (fun value ->
-                            value,
-                            innerLockSemaphore |> Map.find key
-                        )
-                    |> Result.Ok
+        : Result<(string option * int) option, AerospikeReadError> =
+        try  // (Database Table Row)
+
+            let keySet = new Key("test", "TableOne", key)
+            
+            client.Get(null, keySet, valueColumnName)
+            |> Option.ofObj
+            |> Option.map
+                (fun readRec ->
+                    readRec.GetValue(valueColumnName) |> Option.ofObj |> Option.map string,
+                    readRec.generation
                 )
-        }
+            |> Result.Ok
+
+        with
+            | :? _ as ex -> 
+                ex.Message
+                |> AerospikeReadError.Error |> Result.Error
 
     member this.Put
         (
             key: string,
-            value: string,
-            version: KeyValueVersion option
+            value: string option,
+            generation: int
         )
-        :Async<Result<unit, AerospikeWriteError>> =
-        async {
-            return lock
-                innerStore
-                (fun _ ->
-                    if version = (innerLockSemaphore |> Map.tryFind key)  // where None = None, or Some x = Some x
-                    then
-                        innerStore <- innerStore |> Map.add key value
-                        innerLockSemaphore <- innerLockSemaphore |> Map.add key Guid.Empty
-                        () |> Result.Ok
-                    else
-                        AerospikeWriteError.InvalidVersion |> Result.Error
-                )
-        }
+        :Result<unit, AerospikeWriteError> =
+        try  // (Database Table Row)
+            let keySet = new Key("test", "TableOne", key)
 
+            let writePolicy = WritePolicy()
+            writePolicy.generation <- generation
+            writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL  
+
+            match value with
+            | Some value ->
+                let values = [| Bin(valueColumnName, value) |]
+                client.Put(writePolicy, keySet, values)
+            | None ->
+                client.Delete(writePolicy, keySet)
+                |> ignore
+            |> Result.Ok
+        with
+            | :? _ as ex -> 
+                ex.Message
+                |> AerospikeWriteError.Error |> Result.Error
+                
+    interface System.IDisposable with
+        member this.Dispose() =
+            client.Close()
+            client.Dispose()
 
 type ReadError =
     Timeout
@@ -77,7 +92,7 @@ type WriteError =
 
 type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageConfig) = 
 
-    let innerStore = Aerospike()
+    let innerStore = new Aerospike(config)
 
     let serialize
         (value: 'a)
@@ -85,7 +100,7 @@ type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageC
         Sunergeo.Core.Todo.todo()
 
     let deserialize
-        (serializedValue: string)
+        (serializedValue: string option)
         : 'a =
         Sunergeo.Core.Todo.todo()
 
@@ -106,30 +121,28 @@ type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageC
         
     member this.Get
         (key: 'Key)
-        :Async<Result<('Value * KeyValueVersion) option, ReadError>> = 
-        async {
+        :Result<('Value * int) option, ReadError> = 
             let serializedKey = key |> serialize
-            let! serializedValueAndVersion = innerStore.Get serializedKey
-
-            return 
-                serializedValueAndVersion
-                |> ResultModule.bimap
-                    (Option.map (fst >> deserialize))
-                    toReadError
-        }
+            let serializedValueAndVersion = innerStore.Get serializedKey
+            
+            serializedValueAndVersion
+            |> ResultModule.bimap
+                (Option.map (fst >> deserialize))
+                toReadError
 
     member this.Put
         (key: 'Key)
-        (version: KeyValueVersion option)
-        (value: 'Value)
-        :Async<Result<unit, WriteError>> =
-        async {
+        (value: string option)
+        (generation: int)
+        :Result<unit, WriteError> =
             let serializedKey = key |> serialize
             let serializedValue = value |> serialize
-            let! result = innerStore.Put(serializedKey, serializedValue, version)
+            let result = innerStore.Put(serializedKey, value, generation)
+            
+            result
+            |> ResultModule.mapFailure
+                toWriteError
 
-            return 
-                result
-                |> ResultModule.mapFailure
-                    toWriteError
-        }
+    interface System.IDisposable with
+        member this.Dispose() =
+            (innerStore :> System.IDisposable).Dispose()
