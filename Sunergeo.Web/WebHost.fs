@@ -54,6 +54,9 @@ type Startup (config: StartupConfig) =
 
                 | Some (Result.Error error) ->
                     match error.Status with
+                    | ErrorStatus.InvalidOp ->
+                        ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
+                        
                     | ErrorStatus.PermissionDenied ->
                         ctx.Response.StatusCode <- StatusCodes.Status401Unauthorized
 
@@ -85,7 +88,7 @@ type WebHostRoutedCommand = {
 }
 
 type WebHostConfig = {
-    Logger: Sunergeo.Logging.Logger option
+    Logger: Sunergeo.Logging.Logger
     Commands: WebHostRoutedCommand list
     BaseUri: Uri
 }
