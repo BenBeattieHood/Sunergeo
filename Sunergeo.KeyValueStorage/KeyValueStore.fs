@@ -2,6 +2,9 @@
 
 open System
 open Aerospike.Client
+open System.IO
+open System.Runtime.Serialization.Json
+open System.Text
 
 type KeyValueStorageConfig = {
     uri: string // placeholder
@@ -30,7 +33,7 @@ type Aerospike(config: KeyValueStorageConfig) =
         (
             key: string
         )
-        : Result<(string option * int) option, AerospikeReadError> =
+        : Result<(string * int) option, AerospikeReadError> =
         try  // (Database Table Row)
 
             let keySet = new Key("test", "TableOne", key)
@@ -39,8 +42,10 @@ type Aerospike(config: KeyValueStorageConfig) =
             |> Option.ofObj
             |> Option.map
                 (fun readRec ->
-                    readRec.GetValue(valueColumnName) |> Option.ofObj |> Option.map string,
-                    readRec.generation
+                    let value = readRec.GetValue(valueColumnName) |> Option.ofObj
+                    match value with
+                    | Some value -> value :?> string, readRec.generation
+                    | None -> failwith "Boom"
                 )
             |> Result.Ok
 
@@ -90,19 +95,34 @@ type WriteError =
     | InvalidVersion
     | Error of string
 
-type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageConfig) = 
-
-    let innerStore = new Aerospike(config)
+module KeyValueStoreModule =
 
     let serialize
         (value: 'a)
         : string =
-        Sunergeo.Core.Todo.todo()   // use http://www.fssnip.net/1l/title/Convert-an-object-to-json-and-json-to-object
 
-    let deserialize
+        //let realValue = 
+        //    match value with 
+        //    | Some value -> value |> Option.defaultValue ""
+        //    | _ -> value
+
+
+        use ms = new MemoryStream() 
+        (new DataContractJsonSerializer(typeof<'a>)).WriteObject(ms, value) 
+        Encoding.Default.GetString(ms.ToArray()) 
+        
+
+    let deserialize<'a>
         (serializedValue: string)
         : 'a =
-        Sunergeo.Core.Todo.todo()   // use http://www.fssnip.net/1l/title/Convert-an-object-to-json-and-json-to-object
+        use ms = new MemoryStream(ASCIIEncoding.Default.GetBytes(serializedValue))
+        let obj = (new DataContractJsonSerializer(typeof<'a>)).ReadObject(ms) 
+        obj :?> 'a
+
+
+type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageConfig) = 
+
+    let innerStore = new Aerospike(config)
 
     let toReadError
         (aerospikeError: AerospikeReadError)
@@ -122,14 +142,18 @@ type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageC
     member this.Get
         (key: 'Key)
         :Result<('Value * int) option, ReadError> = 
-            let serializedKey = key |> serialize
+            let serializedKey = key |> KeyValueStoreModule.serialize
             let serializedValueAndVersion = innerStore.Get serializedKey
             
             serializedValueAndVersion
             |> ResultModule.bimap
-                (fun (serializedValue, version) ->          // this won't build yet, but I think we need to change aerospike's response to fit this - let's discuss
-                    let value = serializedValue |> deserialize
-                    value, version
+                (fun x ->
+                    match x with
+                    | Some (serializedValue, version) -> 
+                        let value = KeyValueStoreModule.deserialize<'Value> serializedValue
+                        (value, version)
+                        |> Some
+                    | None -> None
                 )
                 toReadError
 
@@ -137,10 +161,9 @@ type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageC
         (key: 'Key)
         (valueOverVersion: ('Value option) * int)
         :Result<unit, WriteError> =
-            let value, version = valueOverVersion
-            let serializedKey = key |> serialize
-            let serializedValue = value |> Option.map serialize
-            let result = innerStore.Put(serializedKey, serializedValue, version)
+            let serializedKey = key |> KeyValueStoreModule.serialize
+            let serializedValue = valueOverVersion |> fst |> Option.map KeyValueStoreModule.serialize
+            let result = innerStore.Put(serializedKey, serializedValue, valueOverVersion |> snd)
             
             result
             |> ResultModule.mapFailure
