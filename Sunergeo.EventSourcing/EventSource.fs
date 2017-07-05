@@ -1,8 +1,11 @@
 ﻿namespace Sunergeo.EventSourcing
 
+open System.Text
 open Sunergeo.Core
 open Sunergeo.KeyValueStorage
 open System.Diagnostics
+open Kafunk
+open Newtonsoft.Json
 
 type Snapshot<'State> = {
     Position: int
@@ -73,6 +76,24 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
                         partition 
                         |> Seq.append [ { Position = partitionLength; Item = item } ]
                     )
+            
+            //Producer
+            let conn = Kafka.connHost "localhost:9092"
+
+            let producerCfg =
+              ProducerConfig.create (
+                topic = config.Topic, 
+                partition = Partitioner.konst (hash partitionId), 
+                requiredAcks = RequiredAcks.Local)
+
+            let producer =
+              Producer.createAsync conn producerCfg
+              |> Async.RunSynchronously
+
+            let mySerializer = JsonConvert.SerializeObject >> Encoding.ASCII.GetBytes
+            let serializedItem = mySerializer item
+            let producerMessage = ProducerMessage.ofBytes(serializedItem)
+            Producer.produce producer producerMessage|> Async.RunSynchronously |> ignore
 
             return partitionLength |> Result.Ok
         }

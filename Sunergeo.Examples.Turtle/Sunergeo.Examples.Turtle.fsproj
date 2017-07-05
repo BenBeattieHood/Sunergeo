@@ -67,6 +67,11 @@
       <Project>{7a2ead93-127d-4066-af91-bf528097cea9}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.EventSourcing\Sunergeo.EventSourcing.fsproj">
+      <Name>Sunergeo.EventSourcing</Name>
+      <Project>{bca1c940-bd2e-4822-951e-16941f87de95}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Sunergeo\Sunergeo.fsproj">
       <Name>Sunergeo</Name>
       <Project>{8140afb6-a2a9-4866-bef5-afd7cd841fd7}</Project>
