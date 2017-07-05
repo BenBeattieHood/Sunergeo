@@ -19,8 +19,6 @@ import { FlexBox } from '../common/FlexBox';
 import { MessageBox } from '../messageBoxModal/index'
 import { TextField } from '../common/TextField';
 
-import { MonolithConfig } from '../../utils/environment'
-
 namespace BaseStyles {
     export const root = Styles.compose(
     )
@@ -32,27 +30,21 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
         ""
         );
 
-    loadingMoreJournals:boolean = false;
-    loadMoreJournals = () => {
-        if (!this.loadingMoreJournals && this.props.journals.serverHasMoreItems) {
-            this.loadingMoreJournals = true;
-            this.journalApi.search({
-                term: this.props.searchCriteria.term,
-                lastResultId: this.props.journals.entries.length ? _.last(this.props.journals.entries).id : undefined
-            })
-            .then(results => {
-                this.loadingMoreJournals = false;
-                this.props.actions.addJournalsFromServer(results.entries, results.more);
-            })
-            .catch((error:Error) => {
-                this.loadingMoreJournals = false;
-                this.props.actions.addAlertMessage({
-                    type: 'Error',
-                    message: error.message
-                });
-                this.props.actions.serverErrored()
-            })
-        }
+    loadTurtles = () => {
+        this.props.actions.updateIsLoading(true);
+        this.turtleApi.getAll()
+        .then(results => {
+            _.forEach(results, result => this.props.actions.addTurtle);
+            this.props.actions.updateIsLoading(false);
+        })
+        .catch((error:Error) => {
+            this.props.actions.updateIsLoading(false);
+            this.props.actions.addAlertMessage({
+                type: 'Error',
+                message: error.message
+            });
+            this.props.actions.serverErrored()
+        })
     }
 
     componentWillMount() {
@@ -78,41 +70,10 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
         )
     }
 
-    renderInfoPanel() {
-        const infoPanel = this.props.infoPanel;
-        if (infoPanel === null) {
-            return null;
-        }
-        else {
-            const closeInfoPanel = () => this.props.actions.closeInfoPanel();
-            return (
-                <Bootstrap.Alert
-                    bsStyle="info"
-                    onDismiss={this.props.actions.closeInfoPanel}
-                    >
-                    <p style={{fontWeight:'bold'}}>{this.props.language.JOURNAL_MAILMATCHER_HEADING}</p>
-
-                    <div dangerouslySetInnerHTML={{__html: dropboxHelpText}} />
-
-                    <p>
-                        <Bootstrap.Button
-                            bsSize="small"
-                            bsStyle="primary"
-                            href={`mailto:${dropboxName}<${dropboxEmail}>?subject=[Journal]`}
-                            target="_blank"
-                            >
-                            {this.props.language.JOURNAL_MAILMATCHER_SEND}
-                        </Bootstrap.Button>
-                    </p>
-                </Bootstrap.Alert>
-            );
-        }
-    }
-
-    containerElement:HTMLDivElement | undefined = undefined;
+    canvasElement:HTMLCanvasElement | null = null;
 
     render() {
-        if (this.props.user === null) {
+        if (this.props.turtles.isLoading) {
             return (
                 <Loader
                     visible={true}
@@ -126,9 +87,10 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
                     <div
                         className="container"
                         >
-                        <div
-                            ref={el => this.containerElement = el}
-                            >
+                        <div>
+                            <canvas
+                                ref={el => this.canvasElement = el}
+                                />
                         </div>
                     </div>
                 </div>
@@ -137,7 +99,7 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
     }
 }
 
-export default ReduxUtils.reduxContainer<ReduxState, ReduxActions, Props>({
+export default ReduxUtils.reduxContainer<ReduxState, ReduxActions, {}>({
     reduxInitialState,
     configureStore,
     componentClass: JournalsPage,

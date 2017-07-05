@@ -98,10 +98,4 @@ export namespace KeyCodes {
     export const BackSlash = 220;
     export const CloseBraket = 221;
     export const SingleQuote = 222;
-} 
-
-export interface MonolithConfig {
-    locksmithToken: string,
-    apiv2BaseUrl: string,
-    languageCode: string
 }

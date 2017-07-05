@@ -28,7 +28,7 @@ export namespace FlexLayout {
     export const Wrap = (wrapping:Wrapping):React.CSSProperties => {
         switch (wrapping) {
             case Wrapping.Wrap: return { flexWrap: 'wrap' };
-            case Wrapping.NoWrap: return { flexWrap: 'no-wrap' };
+            case Wrapping.NoWrap: return { flexWrap: 'nowrap' };
 
             default: const x:never = wrapping; // this is a TS exhaustiveness check
         }

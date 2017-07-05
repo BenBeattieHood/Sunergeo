@@ -3,6 +3,7 @@ import { Turtle } from '../../../../services/serverDataTypes';
 
 export type Action =
     ServerErroredAction
+    | IsLoadingUpdatedAction
     | TurtleAddedAction
     | TurtleUpdatedAction
     ;
@@ -10,6 +11,12 @@ export type Action =
 export const ServerErrored = 'ServerErrored'
 export interface ServerErroredAction {
     type: 'ServerErrored'
+}
+
+export const IsLoadingUpdated = 'IsLoadingUpdated'
+export interface IsLoadingUpdatedAction {
+    type: 'IsLoadingUpdated',
+    isLoading: boolean
 }
 
 export const TurtleAdded = 'TurtleAdded';
@@ -26,6 +33,7 @@ export interface TurtleUpdatedAction {
 
 export interface Actions extends Redux.ActionCreatorsMapObject {
     serverErrored: () => ServerErroredAction,
+
     addTurtle: (turtle:Turtle) => TurtleAddedAction
     updateTurtle: (turtle:Turtle) => TurtleUpdatedAction,
 }
@@ -33,6 +41,11 @@ export interface Actions extends Redux.ActionCreatorsMapObject {
 export const actions:Actions = {
     serverErrored: () => ({
         type: 'ServerErrored'
+    }),
+
+    updateIsLoading: isLoading => ({
+        type: 'IsLoadingUpdated',
+        isLoading
     }),
 
     addTurtle: turtle => ({

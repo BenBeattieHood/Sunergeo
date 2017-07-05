@@ -25,7 +25,7 @@ interface PositionData {
     start: number,
     end: number
 }
-type ScrollContainer = { type: 'Element', value: HTMLElement } | { type: 'Document', value: HTMLDocument } | undefined;
+type ScrollContainer = { type: 'Element', value: HTMLElement } | { type: 'Document', value: HTMLDocument } | null;
 
 export class Waypoint extends React.Component<Props, State> {
     mutationObserver:MutationObserver = new ((window as any)['PolyfilledMutationObserver'])(() => this.refresh());
@@ -72,9 +72,9 @@ export class Waypoint extends React.Component<Props, State> {
     }
 
     componentWillUnmount() {
-        if (this.currentAnimationFrameId !== undefined) {
+        if (this.currentAnimationFrameId !== null) {
             let currentAnimationFrameId = this.currentAnimationFrameId;
-            this.currentAnimationFrameId = undefined;
+            this.currentAnimationFrameId = null;
             window.cancelAnimationFrame(currentAnimationFrameId);
         }
         if (this.mutationObserverConnected) {
@@ -85,9 +85,9 @@ export class Waypoint extends React.Component<Props, State> {
         }
     }
 
-    element:HTMLSpanElement | undefined = undefined;
-    scrollContainer:ScrollContainer = undefined;
-    currentAnimationFrameId:number | undefined = undefined;
+    element:HTMLSpanElement | null = null;
+    scrollContainer:ScrollContainer = null;
+    currentAnimationFrameId:number | null = null;
 
     render() {
         return (
@@ -131,7 +131,7 @@ export class Waypoint extends React.Component<Props, State> {
         if (this.currentAnimationFrameId === undefined) {
             this.currentAnimationFrameId = window.requestAnimationFrame(() => {
                 if (this.element && this.scrollContainer) {
-                    let scrollContainerClientRect = 
+                    let scrollContainerClientRect =
                         this.scrollContainer.type === 'Document'
                         ? this.getWindowBoundingRect()
                         : this.scrollContainer.value.getBoundingClientRect()
@@ -141,7 +141,7 @@ export class Waypoint extends React.Component<Props, State> {
                     let scrollContainerBounds = this.getPositionData(scrollContainerClientRect);
                     let elementBounds = this.getPositionData(elementClientRect);
 
-                    let position = 
+                    let position =
                         (scrollContainerBounds.start < elementBounds.end && scrollContainerBounds.end > elementBounds.start)
                         ? WaypointPosition.Visible
                         : scrollContainerBounds.start > elementBounds.end
@@ -155,7 +155,7 @@ export class Waypoint extends React.Component<Props, State> {
                         this.lastEmittedPosition = position;
                         this.props.onChange(position);
                     }
-                    this.currentAnimationFrameId = undefined;
+                    this.currentAnimationFrameId = null;
                 }
             });
         }

@@ -75,7 +75,7 @@ export class SuggestedInput extends React.Component<Props, State> {
 
     getVisibleItems = () => _.filter(this.props.items, tag => this.props.value === "" || tag.indexOf(this.props.value) >= 0)
 
-    private inputElement:HTMLInputElement | undefined = undefined;
+    private inputElement:HTMLInputElement | null = null;
 
     render() {
         return (

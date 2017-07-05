@@ -8,6 +8,6 @@ const rootElement = document.getElementById(`react-root`);
 if(rootElement == null) throw Error('could not find host element');
 
 render(
-    <Router history={browserHistory} routes={routes({apiv2BaseUrl, languageCode, locksmithToken})} />,
+    <Router history={browserHistory} routes={routes()} />,
     rootElement
 );

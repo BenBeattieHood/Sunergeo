@@ -4,11 +4,11 @@ import * as _ from 'lodash';
 
 export type State = {
     turtles: Turtle[],
-    serverHasMoreItems: boolean
+    isLoading: boolean
 };
 export const initialState:State = {
     turtles: [],
-    serverHasMoreItems: true
+    isLoading: true
 }
 
 export function reducer(state = initialState, action:TurtlesActions.Action):State {
@@ -16,8 +16,14 @@ export function reducer(state = initialState, action:TurtlesActions.Action):Stat
         case TurtlesActions.ServerErrored:
             return {
                 ...state,
-                serverHasMoreItems: false
+                isLoading: false
             };
+
+        case TurtlesActions.IsLoadingUpdated:
+            return {
+                ...state,
+                isLoading: action.isLoading
+            }
 
         case TurtlesActions.TurtleAdded:
             return {
@@ -27,7 +33,7 @@ export function reducer(state = initialState, action:TurtlesActions.Action):Stat
                     ...state.turtles
                 ]
             };
-        
+
         case TurtlesActions.TurtleUpdated:
             return {
                 ...state,

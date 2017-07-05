@@ -110,8 +110,8 @@ export class TagsInput extends React.Component<Props, State> {
         )
     }
 
-    private rootElement:HTMLDivElement | undefined = undefined;
-    private inputElement:SuggestedInput | undefined = undefined;
+    private rootElement:HTMLDivElement | null = null;
+    private inputElement:SuggestedInput | null = null;
 
     blur() {
         if (this.inputElement) {
