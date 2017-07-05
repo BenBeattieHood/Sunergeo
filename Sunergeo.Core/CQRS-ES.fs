@@ -26,3 +26,11 @@ type ICommand<'Id, 'State, 'Event when 'Id : comparison> =
     inherit ICommandBase<'Id>
     abstract Exec: Context -> 'State -> Result<'Event seq, Error>
     
+
+module Utils =    
+    let toTopic<'State>
+        (instanceId: InstanceId)
+        :string = 
+        sprintf "%s.%s" 
+            (typeof<'State>.Name)
+            (instanceId |> string)
