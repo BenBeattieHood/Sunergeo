@@ -32,17 +32,6 @@ type LogError =
 
 type LogTransactionId = string
 
-type EventSourceInitItem<'Id when 'Id : comparison> = 
-    {
-        Id: 'Id
-        CreatedOn: NodaTime.Instant
-    }
-    interface IEvent
-    
-type EventLogItem<'Id, 'Events when 'Id : comparison> = 
-    Init of EventSourceInitItem<'Id>
-    | Event of 'Events
-
 type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogConfig) =
     
     let mutable eventSource:Map<'PartitionId, LogEntry<'Item> seq> = Map.empty /// TODO: replace with kafka with enable.idempotence=true
