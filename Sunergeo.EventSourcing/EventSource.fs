@@ -107,9 +107,8 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
 
 type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(config: EventSourceConfig<'PartitionId, 'State, 'Events>) = 
     let topic = 
-        sprintf "%s.%s"
-            typeof<'State>.Name
-            config.InstanceId |> string
+        config.InstanceId 
+        |> Utils.toTopic<'State>
 
     let logConfig:LogConfig = {
         Topic = topic
