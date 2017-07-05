@@ -145,7 +145,7 @@ module Turtle =
 
 // Commands
 
-[<Route("/turtle/create")>]
+[<Route("/turtle/create", HttpMethod.Put)>]
 type CreateCommand = 
     {
         [<GeneratedId()>] 
@@ -160,7 +160,7 @@ type CreateCommand =
             )
             |> Result.Ok
 
-[<Route("/turtle/{_}/turn-left")>]
+[<Route("/turtle/{TurtleId}/turn-left", HttpMethod.Post)>]
 type TurnLeftCommand = 
     {
         TurtleId: TurtleId
@@ -175,7 +175,7 @@ type TurnLeftCommand =
             }
             |> Result.Ok
             
-[<Route("/turtle/{_}/turn-right")>]
+[<Route("/turtle/{TurtleId}/turn-right", HttpMethod.Post)>]
 type TurnRightCommand = 
     {
         TurtleId: TurtleId
@@ -190,7 +190,7 @@ type TurnRightCommand =
             }
             |> Result.Ok
 
-[<Route("/turtle/{_}/go-forwards")>]
+[<Route("/turtle/{TurtleId}/go-forwards", HttpMethod.Post)>]
 type GoForwardsCommand = 
     {
         TurtleId: TurtleId
@@ -221,7 +221,7 @@ type GoForwardsCommand =
                 |> Error.InvalidOp
                 |> Result.Error
             
-[<Route("/turtle/{_}/set-visibility/{_}")>]
+[<Route("/turtle/{TurtleId}/set-visibility/{IsVisible}", HttpMethod.Post)>]
 type SetVisibilityCommand = 
     {
         TurtleId: TurtleId

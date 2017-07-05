@@ -55,6 +55,9 @@
     <Compile Include="CQRS-ES.fs" />
     <Content Include="packages.config" />
     <Compile Include="Logging.fs" />
+    <Compile Include="HttpMethod.fs" />
+    <Compile Include="RouteAttribute.fs" />
+    <Compile Include="GeneratedIdAttribute.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">

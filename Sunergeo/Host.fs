@@ -46,8 +46,11 @@ type Host(config: Config) =
                 |> HostModule.getAttribute<RouteAttribute>
                 |> Option.map
                     (fun routeAttribute ->
-                        command,
-                        routeAttribute.Uri
+                        { 
+                            WebHostRoutedCommand.PathAndQuery = routeAttribute.PathAndQuery
+                            WebHostRoutedCommand.CommandType = command
+                            WebHostRoutedCommand.HttpMethod = routeAttribute.HttpMethod
+                        }
                     )
             )
             
@@ -59,8 +62,9 @@ type Host(config: Config) =
             |> List.map
                 (fun (command, uri) ->
                     { 
-                        Sunergeo.Web.WebHostRoutedCommand.Path = uri
+                        Sunergeo.Web.WebHostRoutedCommand.PathAndQuery = uri
                         CommandType = command
+                        HttpMethod = 
                     }
                 )
     }
