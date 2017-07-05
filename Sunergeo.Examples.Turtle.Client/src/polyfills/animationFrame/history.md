@@ -1,0 +1,10 @@
+- 0.2.4 avoid using reserved keyword
+- 0.2.3 reverted some 0.2.2 changes which broke bower/component
+- 0.2.2 fix 0.2.0 regression which broke browserify builds #18
+- 0.2.1 fix IE8/9 fail #17
+- 0.2.0 rewrite everything in cjs, only optical changes
+- 0.1.8 fix IE8 issue #13
+- 0.1.6 use xpkg
+- 0.1.5 fix performance.now shim, it requires to be used from 'performance' context
+- 0.1.4 fix callback param
+- 0.1.0 first version
