@@ -97,12 +97,12 @@ type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageC
     let serialize
         (value: 'a)
         : string =
-        Sunergeo.Core.Todo.todo()
+        Sunergeo.Core.Todo.todo()   // use http://www.fssnip.net/1l/title/Convert-an-object-to-json-and-json-to-object
 
     let deserialize
-        (serializedValue: string option)
+        (serializedValue: string)
         : 'a =
-        Sunergeo.Core.Todo.todo()
+        Sunergeo.Core.Todo.todo()   // use http://www.fssnip.net/1l/title/Convert-an-object-to-json-and-json-to-object
 
     let toReadError
         (aerospikeError: AerospikeReadError)
@@ -127,17 +127,20 @@ type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageC
             
             serializedValueAndVersion
             |> ResultModule.bimap
-                (Option.map (fst >> deserialize))
+                (fun (serializedValue, version) ->          // this won't build yet, but I think we need to change aerospike's response to fit this - let's discuss
+                    let value = serializedValue |> deserialize
+                    value, version
+                )
                 toReadError
 
     member this.Put
         (key: 'Key)
-        (value: string option)
-        (generation: int)
+        (valueOverVersion: ('Value option) * int)
         :Result<unit, WriteError> =
+            let value, version = valueOverVersion
             let serializedKey = key |> serialize
-            let serializedValue = value |> serialize
-            let result = innerStore.Put(serializedKey, value, generation)
+            let serializedValue = value |> Option.map serialize
+            let result = innerStore.Put(serializedKey, serializedValue, version)
             
             result
             |> ResultModule.mapFailure

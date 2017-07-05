@@ -1,8 +1,6 @@
 ﻿namespace Sunergeo.Core
 
 type IEvent = interface end
-type ICreatedEvent = 
-    inherit IEvent
 
 type ICommandBase<'Id when 'Id : comparison> =
     abstract GetId: Context -> 'Id
