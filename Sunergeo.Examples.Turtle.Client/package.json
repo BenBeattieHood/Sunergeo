@@ -43,7 +43,7 @@
         "style-loader": "0.18.2",
         "typescript": "2.4.1",
         "url-loader": "0.5.9",
-        "webpack": "3.0.0",
+        "webpack": "2.6.1",
         "webpack-dev-middleware": "1.11.0",
         "webpack-dev-server": "2.5.0"
     },
