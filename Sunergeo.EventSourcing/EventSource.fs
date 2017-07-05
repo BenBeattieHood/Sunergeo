@@ -32,6 +32,17 @@ type LogError =
 
 type LogTransactionId = string
 
+type EventSourceInitItem<'Id when 'Id : comparison> = 
+    {
+        Id: 'Id
+        CreatedOn: NodaTime.Instant
+    }
+    interface IEvent
+    
+type EventLogItem<'Id, 'Events when 'Id : comparison> = 
+    Init of EventSourceInitItem<'Id>
+    | Event of 'Events
+
 type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogConfig) =
     
     let mutable eventSource:Map<'PartitionId, LogEntry<'Item> seq> = Map.empty /// TODO: replace with kafka with enable.idempotence=true
@@ -115,7 +126,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
         Uri = config.LogUri
     }
 
-    let kafkaTopic = LogTopic<'PartitionId, 'Events>(logConfig)
+    let kafkaTopic = LogTopic<'PartitionId, EventLogItem<'PartitionId, 'Events>>(logConfig)
     
     let rec exec
         (context: Context) 
@@ -125,31 +136,43 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
         
         async {
             let partitionId = command.GetId context
-            let! snapshotAndVersionResult = config.SnapshotStore.Get partitionId
+            let snapshotAndVersionResult = config.SnapshotStore.Get partitionId
 
             let snapshotAndVersion =
                 snapshotAndVersionResult
                 |> ResultModule.get
                 
-            let newState, events, version =
+            let newState, newEvents, version =
                 match command, snapshotAndVersion with
                 | :? ICreateCommand<'PartitionId, 'State, 'Events> as createCommand, None ->
-                    let newState, events = 
+                    let newState, newEvents = 
                         createCommand.Exec context 
                         |> ResultModule.get
 
-                    newState, events, None
+                    let newEvents = seq {
+                        yield 
+                            {
+                                EventSourceInitItem.Id = partitionId
+                                EventSourceInitItem.CreatedOn = context.Timestamp
+                            }
+                            |> EventLogItem.Init
+
+                        yield!
+                            newEvents |> Seq.map EventLogItem.Event
+                    }
+
+                    newState, newEvents, None
                 | :? ICommand<'PartitionId, 'State, 'Events> as command, Some (snapshot, version) ->
-                    let events = 
+                    let newEvents = 
                         snapshot.State
                         |> command.Exec context
                         |> ResultModule.get
 
                     let newState = 
-                        events
+                        newEvents
                         |> fold snapshot.State
 
-                    newState, events, (version |> Some)
+                    newState, (newEvents |> Seq.map EventLogItem.Event), (version |> Some)
                 | _ ->
                     failwith "uhoh"
                     
@@ -159,7 +182,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
             try
                 let mutable position:int option = None
 
-                for event in events do
+                for event in newEvents do
                     let! positionResult = kafkaTopic.Add(partitionId, event) 
                     position <- (positionResult |> ResultModule.get |> Some)
                     
@@ -172,7 +195,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
 
                     let snapshotOverVersion = (snapshot |> Some, version)
 
-                    let! snapshotPutResult =
+                    let snapshotPutResult =
                         config.SnapshotStore.Put
                             partitionId
                             snapshotOverVersion
