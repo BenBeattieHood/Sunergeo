@@ -182,7 +182,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
                         Snapshot.State = newState
                     }
 
-                    let snapshotOverVersion = (snapshot |> Some, version)
+                    let snapshotOverVersion = (snapshot, version |> Option.defaultValue 0)
 
                     let snapshotPutResult =
                         config.SnapshotStore.Put
