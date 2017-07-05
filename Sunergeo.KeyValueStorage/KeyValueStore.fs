@@ -7,7 +7,7 @@ open System.Runtime.Serialization.Json
 open System.Text
 
 type KeyValueStorageConfig = {
-    uri: string // placeholder
+    uri: string
     port: int
     logger: Sunergeo.Logging.Logger
 }
@@ -100,13 +100,6 @@ module KeyValueStoreModule =
     let serialize
         (value: 'a)
         : string =
-
-        //let realValue = 
-        //    match value with 
-        //    | Some value -> value |> Option.defaultValue ""
-        //    | _ -> value
-
-
         use ms = new MemoryStream() 
         (new DataContractJsonSerializer(typeof<'a>)).WriteObject(ms, value) 
         Encoding.Default.GetString(ms.ToArray()) 
