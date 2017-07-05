@@ -10,6 +10,7 @@ type KeyValueStorageConfig = {
     uri: string
     port: int
     logger: Sunergeo.Logging.Logger
+    tableName: string
 }
 
 type AerospikeReadError =
@@ -26,6 +27,7 @@ type AerospikeWriteError =
 type Aerospike(config: KeyValueStorageConfig) =
    
     let valueColumnName = "value"
+    let db = "test"
     
     let client = new AerospikeClient(config.uri, config.port)
 
@@ -36,7 +38,7 @@ type Aerospike(config: KeyValueStorageConfig) =
         : Result<(string * int) option, AerospikeReadError> =
         try  // (Database Table Row)
 
-            let keySet = new Key("test", "TableOne", key)
+            let keySet = new Key(db, config.tableName, key)
             
             client.Get(null, keySet, valueColumnName)
             |> Option.ofObj
@@ -53,29 +55,66 @@ type Aerospike(config: KeyValueStorageConfig) =
             | :? _ as ex -> 
                 ex.Message
                 |> AerospikeReadError.Error |> Result.Error
+    
+    member this.Create
+        (
+            key: string,
+            value: string
+        )
+        :Result<unit, AerospikeWriteError> =
+        try
+            let keySet = new Key(db, config.tableName, key)
+
+            let writePolicy = WritePolicy()
+            writePolicy.generation <- 0
+            writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL
+
+            let binValue = new Bin(valueColumnName, value)
+            client.Put(writePolicy, keySet, binValue)
+            |> Result.Ok 
+        with
+            | :? _ as ex -> 
+                ex.Message
+                |> AerospikeWriteError.Error |> Result.Error
+
+    member this.Delete
+        (
+            key: string,
+            generation: int
+        )
+        :Result<unit, AerospikeWriteError> =
+        try
+            let keySet = new Key(db, config.tableName, key)
+
+            let writePolicy = WritePolicy()
+            writePolicy.generation <- generation
+            writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL
+            
+            client.Delete(writePolicy, keySet)
+            |> ignore
+            |> Result.Ok 
+        with
+            | :? _ as ex -> 
+                ex.Message
+                |> AerospikeWriteError.Error |> Result.Error
 
     member this.Put
         (
             key: string,
-            value: string option,
+            value: string,
             generation: int
         )
         :Result<unit, AerospikeWriteError> =
-        try  // (Database Table Row)
-            let keySet = new Key("test", "TableOne", key)
+        try
+            let keySet = new Key(db, config.tableName, key)
 
             let writePolicy = WritePolicy()
             writePolicy.generation <- generation
-            writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL  
+            writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL
 
-            match value with
-            | Some value ->
-                let values = [| Bin(valueColumnName, value) |]
-                client.Put(writePolicy, keySet, values)
-            | None ->
-                client.Delete(writePolicy, keySet)
-                |> ignore
-            |> Result.Ok
+            let binValue = new Bin(valueColumnName, value)
+            client.Put(writePolicy, keySet, binValue)
+            |> Result.Ok 
         with
             | :? _ as ex -> 
                 ex.Message
@@ -149,14 +188,51 @@ type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageC
                     | None -> None
                 )
                 toReadError
+    
+    member this.Create
+        (key: 'Key)
+        (value: 'Value)
+        :Result<unit, WriteError> =
+            let serializedKey =
+                key
+                |> KeyValueStoreModule.serialize
+            let serializedValue =
+                value
+                |> KeyValueStoreModule.serialize
+            let result = innerStore.Create(serializedKey, serializedValue)
+            
+            result
+            |> ResultModule.mapFailure
+                toWriteError
+    
+    member this.Delete
+        (key: 'Key)
+        (generation: int)
+        :Result<unit, WriteError> =
+            let serializedKey =
+                key
+                |> KeyValueStoreModule.serialize
+            let result = innerStore.Delete(serializedKey, generation)
+            
+            result
+            |> ResultModule.mapFailure
+                toWriteError
 
     member this.Put
         (key: 'Key)
-        (valueOverVersion: ('Value option) * int)
+        (valueOverVersion: 'Value * int)
         :Result<unit, WriteError> =
-            let serializedKey = key |> KeyValueStoreModule.serialize
-            let serializedValue = valueOverVersion |> fst |> Option.map KeyValueStoreModule.serialize
-            let result = innerStore.Put(serializedKey, serializedValue, valueOverVersion |> snd)
+            let serializedKey =
+                key
+                |> KeyValueStoreModule.serialize
+            let serializedValue =
+                valueOverVersion
+                |> fst
+                |> KeyValueStoreModule.serialize
+            let generation =
+                valueOverVersion
+                |> snd
+            let result = innerStore.Put(serializedKey, serializedValue, generation)
             
             result
             |> ResultModule.mapFailure
