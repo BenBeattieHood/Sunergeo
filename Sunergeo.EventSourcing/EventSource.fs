@@ -2,6 +2,7 @@
 
 open Sunergeo.Core
 open Sunergeo.KeyValueStorage
+open System.Diagnostics
 
 type Snapshot<'State> = {
     Position: int
@@ -119,7 +120,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
     
     let rec exec
         (context: Context) 
-        (fold: 'State -> ('Events seq) -> 'State)
+        (fold: 'State -> 'Events -> 'State)
         (command: ICommandBase<'PartitionId>)
         :Async<Result<unit, Error>> =
         
@@ -159,7 +160,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
 
                     let newState = 
                         newEvents
-                        |> fold snapshot.State
+                        |> Seq.fold fold snapshot.State
 
                     newState, (newEvents |> Seq.map EventLogItem.Event), (version |> Some)
                 | _ ->
@@ -183,7 +184,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
                     }
 
                     let snapshotOverVersion = (snapshot, version |> Option.defaultValue 0)
-
+                    Debug.WriteLine "Something"
                     let snapshotPutResult =
                         config.SnapshotStore.Put
                             partitionId
@@ -216,6 +217,6 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
     //                (fun x -> Sunergeo.Core.Todo.todo())
     //    }
 
-    member this.Exec(context: Context, command: ICommandBase<'PartitionId>, fold: 'State -> ('Events seq) -> 'State):Async<Result<unit, Error>> =
+    member this.Exec(context: Context, command: ICommandBase<'PartitionId>, fold: 'State -> 'Events-> 'State):Async<Result<unit, Error>> =
         command
         |> exec context fold
