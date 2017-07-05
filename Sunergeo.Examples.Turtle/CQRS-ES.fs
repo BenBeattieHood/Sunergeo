@@ -198,15 +198,16 @@ type GoForwardsCommand =
     interface ICommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context state =
-            let min, max = -100, 100
 
             let canMoveForwards =
-                match (state.Position.X, state.Position.Y, state.Direction) with
-                | (_, max, Direction.North) -> false
-                | max, _, Direction.East -> false
-                | _, min, Direction.South -> false
-                | min, _, Direction.West -> false
-                | _ -> true
+                match state.Position.X, state.Position.Y, state.Direction with
+                | _, 100, Direction.North
+                | 100, _, Direction.East
+                | _, -100, Direction.South
+                | -100, _, Direction.West ->
+                    false
+                | _ ->
+                    true
                 
             if canMoveForwards 
             then
