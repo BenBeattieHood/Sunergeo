@@ -60,11 +60,11 @@ type Host(config: Config) =
         Commands = 
             commandsWithRoutes
             |> List.map
-                (fun (command, uri) ->
+                (fun command ->
                     { 
-                        Sunergeo.Web.WebHostRoutedCommand.PathAndQuery = uri
-                        CommandType = command
-                        HttpMethod = 
+                        Sunergeo.Web.WebHostRoutedCommand.PathAndQuery = command.PathAndQuery
+                        CommandType = command.CommandType
+                        HttpMethod = command.HttpMethod
                     }
                 )
     }

@@ -3,12 +3,16 @@
 
 open System
 open Sunergeo.Hosting
+open Sunergeo.Logging
 
 [<EntryPoint>]
 let main argv = 
     let assemblies = [typeof<Sunergeo.Examples.Turtle.Turtle>.Assembly]
     let config:Config = {
-        Logger = None
+        Logger = 
+            (fun (logLevel: LogLevel) (message: string) ->
+                System.Console.WriteLine message
+            )
         BaseUri = Uri("http://localhost:8080")
         Assemblies = assemblies
     }
