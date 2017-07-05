@@ -197,7 +197,7 @@ type GoForwardsCommand =
     }
     interface ICommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
-        member this.Exec context _ =
+        member this.Exec context state =
             let min, max = -100, 100
 
             let canMoveForwards =
