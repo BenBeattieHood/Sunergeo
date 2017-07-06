@@ -24,8 +24,12 @@ const turtleImageEast = require('./turtle-east.png');
 const turtleImageSouth = require('./turtle-south.png');
 const turtleImageWest = require('./turtle-west.png');
 
-let canvasWidth = 800
-let canvasHeight = 800
+let canvasWidth = 260
+let canvasHeight = 260
+
+let canvasBorderStyle = {
+    border: "1px solid #000000"
+}
 
 namespace BaseStyles {
     export const root = Styles.compose(
@@ -179,6 +183,7 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
                                 ref={el => this.canvasElement = el}
                                 width={canvasWidth}
                                 height={canvasHeight}
+                                style={canvasBorderStyle}
                             />
                             <br />
                             <br />
@@ -238,9 +243,9 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
 
                             // Draw turtle path
                             context.beginPath();
-                            context.moveTo(turtle.positions[0].x, turtle.positions[0].y);
+                            context.moveTo(turtle.positions[0].x + 130, turtle.positions[0].y + 130);
                             for (var i = 1; i < turtle.positions.length; i++) {
-                                context.lineTo(turtle.positions[i].x, turtle.positions[i].y);
+                                context.lineTo(turtle.positions[i].x + 130, turtle.positions[i].y + 130);
                             }
                             context.strokeStyle = "blue";
                             context.stroke();
@@ -249,11 +254,11 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
                             switch (turtle.direction) {
                                 case Direction.North:
                                 case Direction.South:
-                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x, turtle.positions[turtle.positions.length - 1].y, 42, 60);
+                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x + 130 - 21, turtle.positions[turtle.positions.length - 1].y + 130 - 30, 42, 60);
                                     break;
                                 case Direction.East:
                                 case Direction.West:
-                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x, turtle.positions[turtle.positions.length - 1].y, 60, 42);
+                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x + 130 - 30, turtle.positions[turtle.positions.length - 1].y + 130 - 21, 60, 42);
                                     break;
                             }
                         }
