@@ -53,7 +53,7 @@ type ProjectionHost<'PartitionId, 'Events, 'State when 'PartitionId : comparison
         config.InstanceId 
         |> Utils.toTopic<'State>
 
-    let kafkaConsumerGroupName = topic
+    let kafkaConsumerGroupName = topic + "-group"
 
     let system =
         config.Assemblies           /// I don't think this'll work for us
