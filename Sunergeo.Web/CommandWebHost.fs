@@ -1,29 +1,19 @@
-﻿namespace Sunergeo.Web
+﻿namespace Sunergeo.Web.Commands
 
 open System
 open Sunergeo.Core
+open Sunergeo.Web
 
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module HttpMethod =
-    let fromString(s:string):HttpMethod =
-        match s with
-        | "GET" -> HttpMethod.Get
-        | "PATCH" -> HttpMethod.Patch
-        | "PUT" -> HttpMethod.Put
-        | "POST" -> HttpMethod.Post
-        | "DELETE" -> HttpMethod.Delete
-        | _ -> invalidArg "s" (sprintf "Unsupported HTTP method '%s'" s) |> raise
+//type LogConfig = {
+//    LogName: string
+//}
 
-type LogConfig = {
-    LogName: string
-}
-
-type RequestHandler = 
+type CommandRequestHandler = 
     Microsoft.AspNetCore.Http.HttpRequest -> (Result<unit, Error> option)
 
-type StartupConfig = {
+type CommandWebHostStartupConfig = {
     Logger: Sunergeo.Logging.Logger
-    Handlers: RequestHandler list
+    Handlers: CommandRequestHandler list
 }
 
 
@@ -35,7 +25,7 @@ open Sunergeo.Logging
 open Microsoft.Extensions.DependencyInjection;
 
 
-type Startup (config: StartupConfig) = 
+type CommandWebHostStartup (config: CommandWebHostStartupConfig) = 
 
     member x.Configure 
         (
@@ -93,19 +83,19 @@ type Startup (config: StartupConfig) =
         app.Run(RequestDelegate(reqHandler))
         
         
-type WebHostRoutedCommand = {
+type RoutedCommand = {
     PathAndQuery: string
     HttpMethod: HttpMethod
     CommandType: Type
 }
 
-type WebHostConfig = {
+type CommandWebHostConfig = {
     Logger: Sunergeo.Logging.Logger
-    Commands: WebHostRoutedCommand list
+    Commands: RoutedCommand list
     BaseUri: Uri
 }
 
-module WebHost =
+module CommandWebHost =
     open System.Text.RegularExpressions
     
     let routePathAndQueryVariableRegex = Regex(@"\{(.+?)\}", RegexOptions.Compiled)
@@ -139,8 +129,8 @@ module WebHost =
             failwith "TODO"
 
     let createHandler 
-        (command: WebHostRoutedCommand)
-        :RequestHandler =
+        (command: RoutedCommand)
+        :CommandRequestHandler =
         let pathAndQueryRegexString = command.PathAndQuery |> routePathAndQueryToRegexString
         let pathAndQueryRegex = Regex(pathAndQueryRegexString, RegexOptions.Compiled)
 
@@ -230,21 +220,21 @@ module WebHost =
                     None
         )
 
-    let create (config: WebHostConfig): IWebHost =
+    let create (config: CommandWebHostConfig): IWebHost =
         let handlers = 
             config.Commands
             |> List.map createHandler
             
         let startupConfig =
             {
-                StartupConfig.Logger = config.Logger
-                StartupConfig.Handlers = handlers
+                CommandWebHostStartupConfig.Logger = config.Logger
+                CommandWebHostStartupConfig.Handlers = handlers
             }
 
         WebHostBuilder()
-            .ConfigureServices(fun services -> services.AddSingleton<StartupConfig>(startupConfig) |> ignore)
+            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig>(startupConfig) |> ignore)
             .UseKestrel()
-            .UseStartup<Startup>()
+            .UseStartup<CommandWebHostStartup>()
             .UseUrls(config.BaseUri |> string)
             .Build()
       

@@ -20,7 +20,7 @@ let main argv =
     }
 
     use host = 
-        Host(config)
+        CommandHost(config)
 
     let logConfig:LogConfig = {
         Uri = "localhost:9092"
