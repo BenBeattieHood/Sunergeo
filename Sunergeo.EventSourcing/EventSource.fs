@@ -41,6 +41,27 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
     let mutable eventSource:Map<'PartitionId, LogEntry<'Item> seq> = Map.empty /// TODO: replace with kafka with enable.idempotence=true
     let toAsync (a:'a): Async<'a> = async { return a }
 
+    let conn = Kafka.connHost "localhost:9092"
+    let producerMap : Map<'PartitionId, Producer> = Map.empty
+
+    let createProducer (partitionId: 'PartitionId) =
+        let producerCfg =
+              ProducerConfig.create (
+                topic = config.Topic, 
+                partition = Partitioner.konst (hash partitionId), 
+                requiredAcks = RequiredAcks.Local)
+
+        let producer =
+            Producer.createAsync conn producerCfg
+            |> Async.RunSynchronously
+
+        producer
+
+    let addProducerToMap (partitionId: 'PartitionId) =
+        let producer = createProducer partitionId
+        producerMap.Add(partitionId, producer) |> ignore
+        producer
+
     // https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/
     member this.BeginTransaction(): Async<LogTransactionId> =
         async {
@@ -59,46 +80,16 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
 
     member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int64, LogError>> =
         async {
-            let partition =
-                eventSource
-                |> Map.tryFind partitionId
-                |> Option.defaultValue Seq.empty
+            let producer = match producerMap.ContainsKey partitionId with
+                            | true -> producerMap.[partitionId]
+                            | false -> addProducerToMap partitionId            
 
-            let partitionLength = 
-                partition
-                |> Seq.length
-            
-            eventSource <- 
-                eventSource 
-                |> Map.add 
-                    partitionId 
-                    (
-                        partition 
-                        |> Seq.append [ { Position = partitionLength; Item = item } ]
-                    )
-            
-            //Producer
-            let conn = Kafka.connHost "localhost:9092"
-
-            let producerCfg =
-              ProducerConfig.create (
-                topic = config.Topic, 
-                partition = Partitioner.konst (hash partitionId), 
-                requiredAcks = RequiredAcks.Local)
-
-            let producer =
-              Producer.createAsync conn producerCfg
-              |> Async.RunSynchronously
-
-            let mySerializer = JsonConvert.SerializeObject >> Encoding.ASCII.GetBytes
-            let serializedItem = mySerializer item
+            let jsonSerializer = JsonConvert.SerializeObject >> Encoding.ASCII.GetBytes
+            let serializedItem = jsonSerializer item
             let producerMessage = ProducerMessage.ofBytes(serializedItem)
 
-            let resultWrappedAsync = Producer.produce producer producerMessage
-            let! result = resultWrappedAsync
-            let currentOffset = (int64)result.offset
-            let finalResult = currentOffset |> Result.Ok
-            return finalResult
+            let! result = Producer.produce producer producerMessage
+            return (int64)result.offset |> Result.Ok
         }
 
     member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<LogEntry<'Item> seq, LogError>> =
