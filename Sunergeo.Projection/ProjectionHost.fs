@@ -41,7 +41,6 @@ type Projector<'PartitionId, 'Events, 'State when 'PartitionId : comparison>(cre
         }
 
 type ProjectionHostConfig = {
-    Assemblies: Assembly list   // todo: remove
     InstanceId: InstanceId
     KafkaUri: Uri
 }

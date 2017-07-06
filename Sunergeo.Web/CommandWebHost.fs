@@ -79,8 +79,8 @@ module CommandWebHost =
             RoutedCommand.PathAndQuery = command.PathAndQuery
             RoutedCommand.HttpMethod = command.HttpMethod
             RoutedCommand.Exec = 
-                (fun (wrappedTarget: obj) (request: HttpRequest) ->
-                    command.Exec (wrappedTarget :?> 'Command) request
+                (fun (context: Context) (wrappedTarget: obj) (request: HttpRequest) ->
+                    command.Exec context (wrappedTarget :?> 'Command) request
                 )
         }
 

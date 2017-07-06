@@ -249,17 +249,6 @@ type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(c
 
                   
         }
-    
-    //member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<'Events seq, Error>> = 
-    //    async {
-    //        let! entries = kafkaTopic.ReadFrom(partitionId, positionId)
-
-    //        return 
-    //            entries 
-    //            |> ResultModule.bimap
-    //                (Seq.map (fun x -> x.Item))
-    //                (fun x -> Sunergeo.Core.Todo.todo())
-    //    }
 
     member this.Exec(partitionId: 'PartitionId, context: Context, commandResult: CommandResult<'State, 'Events>, fold: 'State -> 'Events-> 'State):Async<Result<unit, Error>> =
         commandResult

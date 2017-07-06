@@ -10,7 +10,7 @@ open Sunergeo.Web
 type RoutedType<'TargetType, 'Result> = {
     PathAndQuery: string
     HttpMethod: HttpMethod
-    Exec: 'TargetType -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error>
+    Exec: 'TargetType -> Context -> Result<'Result, Error>
 }
 
 type RoutedTypeRequestHandler<'Result> = 
@@ -46,7 +46,7 @@ let createUriPathOrQueryParamParser
     elif targetType = typeof<Double> then
         (fun s -> upcast (Double.Parse s))
     else
-        failwith "TODO"
+        (fun s -> Sunergeo.Core.Todo.todo<obj>())
 
 
 let createHandler 

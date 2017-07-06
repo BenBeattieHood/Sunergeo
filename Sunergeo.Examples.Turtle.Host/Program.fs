@@ -68,7 +68,7 @@ let main argv =
                         RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.PathAndQuery
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.HttpMethod
                         RoutedCommand.Exec = 
-                            (fun (command: CreateCommand) ->
+                            (fun (command: CreateCommand) (context: Context) (request: HttpRequest) ->
                                 (command :> ICreateCommand).Exec
                             )
                     }
