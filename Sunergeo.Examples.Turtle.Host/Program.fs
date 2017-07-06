@@ -8,6 +8,7 @@ open Sunergeo.KeyValueStorage
 open Sunergeo.Logging
 open Sunergeo.Web
 open Sunergeo.Web.Commands
+open Sunergeo.Web.Queries
 open Sunergeo.Examples.Turtle
 open ResultModule
 

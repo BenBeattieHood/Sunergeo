@@ -56,9 +56,14 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="CQRS-ES.fs" />
     <None Include="App.config" />
     <Content Include="packages.config" />
+    <Compile Include="Core.fs" />
+    <Compile Include="Events.fs" />
+    <Compile Include="State.fs" />
+    <Compile Include="Aggregate.fs" />
+    <Compile Include="Commands.fs" />
+    <Compile Include="Queries.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sunergeo.Core\Sunergeo.Core.fsproj">
