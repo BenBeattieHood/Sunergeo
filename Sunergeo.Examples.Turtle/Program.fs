@@ -35,6 +35,9 @@ let main argv =
 
     let outerResult = async {
         let! result1 = logTopic.Add(0, evt)
+        match result1 with
+        | Result.Ok offset -> printfn "%i" offset
+        | Result.Error e -> printf "Error of some kind"
         result1
     }
     
