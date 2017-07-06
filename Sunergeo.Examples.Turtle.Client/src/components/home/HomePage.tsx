@@ -8,7 +8,7 @@ import { State as ReduxState, initialState as reduxInitialState } from './redux/
 import configureStore from './redux/store/configureStore';
 
 // Server interop
-import { Turtle } from '../../services/serverDataTypes';
+import { Turtle, Direction } from '../../services/serverDataTypes';
 import { TurtleApi } from '../../services/TurtleApi';
 
 // UI controls
@@ -19,7 +19,13 @@ import { FlexBox } from '../common/FlexBox';
 import { MessageBox } from '../messageBoxModal/index'
 import { TextField } from '../common/TextField';
 
-const turtleImage = require('./turtle.png');
+const turtleImageNorth = require('./turtle-north.png');
+const turtleImageEast = require('./turtle-east.png');
+const turtleImageSouth = require('./turtle-south.png');
+const turtleImageWest = require('./turtle-west.png');
+
+let canvasWidth = 800
+let canvasHeight = 800
 
 namespace BaseStyles {
     export const root = Styles.compose(
@@ -60,7 +66,99 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
         )
     }
 
-    canvasElement:HTMLCanvasElement | null = null;
+    createTurtle() {
+        //TODO: Need to call TurtleApi for this
+
+        let turtle: Turtle = {
+            turtleId: 1,
+            positions: [
+                { x: 0, y: 0 }
+            ],
+            direction: Direction.East,
+            isVisible: true
+        }
+
+        this.props.actions.addTurtle(turtle);
+    }
+
+    turnLeft() {
+        //TODO: Need to call TurtleApi for this
+        let turtle = this.props.serverEntities.turtles[0];
+        let updatedTurtle: Turtle = {
+            ...turtle
+        }
+
+        switch (updatedTurtle.direction) {
+            case Direction.North:
+                updatedTurtle.direction = Direction.West;
+                break;
+            case Direction.East:
+                updatedTurtle.direction = Direction.North;
+                break;
+            case Direction.South:
+                updatedTurtle.direction = Direction.East;
+                break;
+            case Direction.West:
+                updatedTurtle.direction = Direction.South;
+                break;
+        }
+
+        this.props.actions.updateTurtle(updatedTurtle);
+    }
+
+    turnRight() {
+        //TODO: Need to call TurtleApi for this
+
+        let turtle = this.props.serverEntities.turtles[0];
+        let updatedTurtle: Turtle = {
+            ...turtle
+        }
+
+        switch (updatedTurtle.direction) {
+            case Direction.North:
+                updatedTurtle.direction = Direction.East;
+                break;
+            case Direction.East:
+                updatedTurtle.direction = Direction.South;
+                break;
+            case Direction.South:
+                updatedTurtle.direction = Direction.West;
+                break;
+            case Direction.West:
+                updatedTurtle.direction = Direction.North;
+                break;
+        }
+
+        this.props.actions.updateTurtle(updatedTurtle);
+    }
+
+    moveForwards() {
+        //TODO: Need to call TurtleApi for this
+
+        let turtle = this.props.serverEntities.turtles[0];
+        let updatedTurtle: Turtle = {
+            ...turtle
+        }
+
+        switch (updatedTurtle.direction) {
+            case Direction.North:
+                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x, y: turtle.positions[turtle.positions.length - 1].y - 10 });
+                break;
+            case Direction.East:
+                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x + 10, y: turtle.positions[turtle.positions.length - 1].y });
+                break;
+            case Direction.South:
+                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x, y: turtle.positions[turtle.positions.length - 1].y + 10 });
+                break;
+            case Direction.West:
+                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x - 10, y: turtle.positions[turtle.positions.length - 1].y });
+                break;
+        }
+
+        this.props.actions.updateTurtle(updatedTurtle);
+    }
+
+    canvasElement: HTMLCanvasElement | null = null;
 
     render() {
         if (this.props.serverEntities.isLoading) {
@@ -74,16 +172,24 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
         return (
             <div style={BaseStyles.root}>
                 <div className="container-fluid">
-                    <div
-                        className="container"
-                        >
+                    <div className="container">
                         {this.renderAlertMessage()}
                         <div>
                             <canvas
                                 ref={el => this.canvasElement = el}
-                                width="800px"
-                                height="800px"
-                                />
+                                width={canvasWidth}
+                                height={canvasHeight}
+                            />
+                            <br />
+                            <br />
+                            <Bootstrap.ButtonToolbar>
+                                <Bootstrap.ButtonGroup>
+                                    <Bootstrap.Button onClick={() => this.createTurtle()}>Create</Bootstrap.Button>
+                                    <Bootstrap.Button onClick={() => this.turnLeft()}>Turn left</Bootstrap.Button>
+                                    <Bootstrap.Button onClick={() => this.turnRight()}>Turn right</Bootstrap.Button>
+                                    <Bootstrap.Button onClick={() => this.moveForwards()}>Move forward</Bootstrap.Button>
+                                </Bootstrap.ButtonGroup>
+                            </Bootstrap.ButtonToolbar>
                         </div>
                     </div>
                 </div>
@@ -100,19 +206,68 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
     }
 
     rerenderTurtles() {
-        if (this.canvasElement !== null) {
-            var context = this.canvasElement.getContext('2d'); 
+        try {            
+            if (this.canvasElement !== null) {
+                var context = this.canvasElement.getContext('2d');
                 _.forEach(this.props.serverEntities.turtles, turtle => {
                     var imageObj = new Image();
 
-                    imageObj.onload = function() {                        
+                    switch (turtle.direction) {
+                        case Direction.North:
+                            imageObj.src = turtleImageNorth;
+                            break;
+                        case Direction.East:
+                            imageObj.src = turtleImageEast;
+                            break;
+                        case Direction.West:
+                            imageObj.src = turtleImageWest;
+                            break;
+                        case Direction.South:
+                            imageObj.src = turtleImageSouth;
+                            break;
+                        default:
+                            imageObj.src = turtleImageNorth;
+                            break;
+                    }
+
+                    imageObj.onload = function () {
                         if (context !== null) {
-                            context.drawImage(imageObj, turtle.positions[turtle.positions.length -1].x, turtle.positions[turtle.positions.length -1].y);
+
+                            // Clear the canvas
+                            context.clearRect(0, 0, canvasWidth, canvasHeight);
+
+                            // Draw turtle path
+                            context.beginPath();
+                            context.moveTo(turtle.positions[0].x, turtle.positions[0].y);
+                            for (var i = 1; i < turtle.positions.length; i++) {
+                                context.lineTo(turtle.positions[i].x, turtle.positions[i].y);
+                            }
+                            context.strokeStyle = "blue";
+                            context.stroke();
+
+                            // Draw turtle final position and orientation
+                            switch (turtle.direction) {
+                                case Direction.North:
+                                case Direction.South:
+                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x, turtle.positions[turtle.positions.length - 1].y, 42, 60);
+                                    break;
+                                case Direction.East:
+                                case Direction.West:
+                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x, turtle.positions[turtle.positions.length - 1].y, 60, 42);
+                                    break;
+                            }
                         }
                     };
-                    imageObj.src = turtleImage;
+                });
+            }
+        } catch (error) {
+            this.props.actions.updateIsLoading(false);
+                this.props.actions.addAlertMessage({
+                    type: 'Error',
+                    message: error.message
                 });
         }
+
     }
 }
 

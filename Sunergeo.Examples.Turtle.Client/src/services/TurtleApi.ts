@@ -20,56 +20,11 @@ export class TurtleApi {
         r: result => result as Turtle
     })
     
-    // getAll = () => 
-    // this.restApi.get({
-    //     uri: `/`,
-    //     r: result => {
-    //        return [
-    //         {
-    //             turtleId: "1",
-    //             direction: Direction.North,
-    //             positions: [{
-    //                 x: 1,
-    //                 y: -1
-    //             }],
-    //             isVisible: true
-    //         },
-    //         {
-    //             turtleId: "2",
-    //             direction: Direction.North,
-    //             positions: [{
-    //                 x: 1,
-    //                 y: -1
-    //             }],
-    //             isVisible: true
-    //         }
-    //        ]
-    //     }
-    // })
-
     getAll = () => {
-            return new Promise((resolve,reject) => {
-                resolve ([
-                    {
-                        turtleId: "1",
-                        direction: Direction.North,
-                        positions: [{
-                            x: 1,
-                            y: -1
-                        }],
-                        isVisible: true
-                    },
-                    {
-                        turtleId: "2",
-                        direction: Direction.North,
-                        positions: [{
-                            x: 1,
-                            y: -1
-                        }],
-                        isVisible: true
-                    }
-                ]);
-            })
+        return new Promise((resolve,reject) => {
+
+            resolve([]);
+        });
     }
 
     // getAll = () => 
