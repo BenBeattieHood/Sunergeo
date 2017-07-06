@@ -222,12 +222,17 @@ type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(c
                         Snapshot.State = newState
                     }
 
-                    let snapshotOverVersion = (snapshot, version |> Option.defaultValue 0)
-                    Debug.WriteLine "Something"
                     let snapshotPutResult =
-                        config.SnapshotStore.Put
-                            partitionId
-                            snapshotOverVersion
+                        match version with
+                        | None ->
+                            config.SnapshotStore.Create
+                                partitionId
+                                snapshot
+
+                        | Some version ->
+                            config.SnapshotStore.Put
+                                partitionId
+                                (snapshot, version)
 
                     do snapshotPutResult |> ResultModule.get
 
