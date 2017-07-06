@@ -24,8 +24,16 @@ const turtleImageEast = require('./turtle-east.png');
 const turtleImageSouth = require('./turtle-south.png');
 const turtleImageWest = require('./turtle-west.png');
 
-let canvasWidth = 260
-let canvasHeight = 260
+const scaleFactor = 3;
+const canvasWidth = 260 * scaleFactor;
+const canvasHeight = 260 * scaleFactor;
+const turtleMovementUnit = 10 * scaleFactor;
+const canvasHalfWidth = canvasWidth / 2;
+const canvasHalfHeight = canvasHeight / 2;
+const turtleImageWidth = 42 * scaleFactor;
+const turtleImageHeight = 60 * scaleFactor;
+const turtleHalfImageWidth = turtleImageWidth / 2;
+const turtleHalfImageHeight = turtleImageHeight / 2;
 
 let canvasBorderStyle = {
     border: "1px solid #000000"
@@ -146,16 +154,16 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
 
         switch (updatedTurtle.direction) {
             case Direction.North:
-                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x, y: turtle.positions[turtle.positions.length - 1].y - 10 });
+                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x, y: turtle.positions[turtle.positions.length - 1].y - turtleMovementUnit });
                 break;
             case Direction.East:
-                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x + 10, y: turtle.positions[turtle.positions.length - 1].y });
+                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x + turtleMovementUnit, y: turtle.positions[turtle.positions.length - 1].y });
                 break;
             case Direction.South:
-                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x, y: turtle.positions[turtle.positions.length - 1].y + 10 });
+                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x, y: turtle.positions[turtle.positions.length - 1].y + turtleMovementUnit });
                 break;
             case Direction.West:
-                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x - 10, y: turtle.positions[turtle.positions.length - 1].y });
+                updatedTurtle.positions.push({ x: turtle.positions[turtle.positions.length - 1].x - turtleMovementUnit, y: turtle.positions[turtle.positions.length - 1].y });
                 break;
         }
 
@@ -243,9 +251,9 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
 
                             // Draw turtle path
                             context.beginPath();
-                            context.moveTo(turtle.positions[0].x + 130, turtle.positions[0].y + 130);
+                            context.moveTo(turtle.positions[0].x + canvasHalfWidth, turtle.positions[0].y + canvasHalfHeight);
                             for (var i = 1; i < turtle.positions.length; i++) {
-                                context.lineTo(turtle.positions[i].x + 130, turtle.positions[i].y + 130);
+                                context.lineTo(turtle.positions[i].x + canvasHalfWidth, turtle.positions[i].y + canvasHalfHeight);
                             }
                             context.strokeStyle = "blue";
                             context.stroke();
@@ -254,11 +262,11 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
                             switch (turtle.direction) {
                                 case Direction.North:
                                 case Direction.South:
-                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x + 130 - 21, turtle.positions[turtle.positions.length - 1].y + 130 - 30, 42, 60);
+                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x + canvasHalfWidth - turtleHalfImageWidth, turtle.positions[turtle.positions.length - 1].y + canvasHalfHeight - turtleHalfImageHeight, turtleImageWidth, turtleImageHeight);
                                     break;
                                 case Direction.East:
                                 case Direction.West:
-                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x + 130 - 30, turtle.positions[turtle.positions.length - 1].y + 130 - 21, 60, 42);
+                                    context.drawImage(imageObj, turtle.positions[turtle.positions.length - 1].x + canvasHalfWidth - turtleHalfImageHeight, turtle.positions[turtle.positions.length - 1].y + canvasHalfHeight - turtleHalfImageWidth, turtleImageHeight, turtleImageWidth);
                                     break;
                             }
                         }
