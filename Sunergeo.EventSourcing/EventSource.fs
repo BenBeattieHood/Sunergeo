@@ -38,8 +38,6 @@ type LogError =
 type LogTransactionId = string
 
 type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogConfig) =
-    
-    let mutable eventSource:Map<'PartitionId, LogEntry<'Item> seq> = Map.empty /// TODO: replace with kafka with enable.idempotence=true
     let toAsync (a:'a): Async<'a> = async { return a }
 
     let kafkaConnection = Kafka.connHost (sprintf "%s:%i" config.Uri.Host config.Uri.Port)
@@ -47,7 +45,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
 
     let consumerFunc (state:ConsumerState) (messageSet:ConsumerMessageSet): Async<unit> = 
         async {
-                printfn "member_id=%s topic=%s partition=%i" state.memberId messageSet.topic messageSet.partition
+                printfn "\nMESSAGE: member_id=%s topic=%s partition=%i" state.memberId messageSet.topic messageSet.partition
                 printfn "%s" (System.Text.Encoding.ASCII.GetString messageSet.messageSet.messages.[0].message.value.Array)
         }
 
@@ -78,12 +76,12 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
 
     member this.AbortTransaction(): Async<unit> =
         async {
-            return Sunergeo.Core.Todo.todo()
+            return Sunergeo.Core.NotImplemented.NotImplemented()
         }
 
     member this.CommitTransaction(): Async<unit> =
         async {
-            return Sunergeo.Core.Todo.todo()
+            return Sunergeo.Core.NotImplemented.NotImplemented()
         }
 
     member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int64, LogError>> =
@@ -105,20 +103,13 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
         }
 
     member this.ReadFrom(partitionId: 'PartitionId, positionId: int64): Async<Result<LogEntry<'Item> seq, LogError>> =
-        async {
-
-
-            let consumerOffsets =
-              Consumer.fetchOffsets kafkaConnection "turtle-group" [||]
-              |> Async.RunSynchronously
-
-            //consumer            
-            let group = "turtle-group"
+        async {         
             let topic = "turtle"
+            let consumerGroup = "turtle-group"
 
             let consumerConfig = 
                 ConsumerConfig.create (
-                  groupId = group, 
+                  groupId = consumerGroup, 
                   topic = topic, 
                   autoOffsetReset = AutoOffsetReset.StartFromTime Time.EarliestOffset,
                   fetchMaxBytes = 1000000,
@@ -138,7 +129,6 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             let mutable mutableSet:ConsumerMessageSet = new ConsumerMessageSet()
 
             let r = Consumer.consume consumer consumerFunc // |> Async.RunSynchronously
-            // printf "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
 
             //Consumer.consume consumer 
             //  (fun (state:ConsumerState) (messageSet:ConsumerMessageSet) -> async {
@@ -152,31 +142,8 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             let errorResult = Result.Error error
 
             return errorResult
-
-            //let result =
-            //    eventSource
-            //    |> Map.tryFind partitionId
-            //    |> function
-            //        | Some items ->
-            //            items
-            //            |> Seq.skip positionId
-            //        | None ->
-            //            upcast [] 
-
-            //return result |> Result.Ok
         }
-
-    member this.ReadLast(partitionId: 'PartitionId): Async<Result<LogEntry<'Item> option, LogError>> =
-        async {
-            let result =
-                eventSource
-                |> Map.tryFind partitionId
-                |> Option.map
-                    (fun x -> x |> Seq.last)
-
-            return result |> Result.Ok
-        }
-        
+ 
     interface System.IDisposable with
         member this.Dispose() =
             kafkaConnection.Close()
@@ -273,7 +240,7 @@ type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(c
             with
                 | :? _ as ex ->
                     do! kafkaTopic.AbortTransaction()
-                    return Sunergeo.Core.Todo.todo()
+                    return Sunergeo.Core.NotImplemented.NotImplemented() //This needs transaction support
 
                   
         }

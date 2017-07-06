@@ -1,4 +1,4 @@
-import { TurtleId, Turtle } from './serverDataTypes';
+import { TurtleId, Turtle, Direction, Position } from './serverDataTypes';
 import * as Promise from 'bluebird';
 import { RestApiV2 } from './RestApi';
 
@@ -19,12 +19,19 @@ export class TurtleApi {
         uri: `/api/turtle/${id}`,
         r: result => result as Turtle
     })
+    
+    getAll = () => {
+        return new Promise((resolve,reject) => {
 
-    getAll = () => 
-    this.restApi.get({
-        uri: `/api/turtles`,
-        r: result => result as Turtle[]
-    })
+            resolve([]);
+        });
+    }
+
+    // getAll = () => 
+    // this.restApi.get({
+    //     uri: `/api/turtles`,
+    //     r: result => result as Turtle[]
+    // })
 
     create = ():Promise<TurtleId> => 
     this.restApi.post({
