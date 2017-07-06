@@ -8,7 +8,7 @@ open Kafunk
 open Newtonsoft.Json
 
 type Snapshot<'State> = {
-    Position: int
+    Position: int64
     State: 'State
 }
 
@@ -57,7 +57,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             return Sunergeo.Core.Todo.todo()
         }
 
-    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int, LogError>> =
+    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int64, LogError>> =
         async {
             let partition =
                 eventSource
@@ -93,9 +93,12 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             let mySerializer = JsonConvert.SerializeObject >> Encoding.ASCII.GetBytes
             let serializedItem = mySerializer item
             let producerMessage = ProducerMessage.ofBytes(serializedItem)
-            Producer.produce producer producerMessage|> Async.RunSynchronously |> ignore
 
-            return partitionLength |> Result.Ok
+            let resultWrappedAsync = Producer.produce producer producerMessage
+            let! result = resultWrappedAsync
+            let currentOffset = (int64)result.offset
+            let finalResult = currentOffset |> Result.Ok
+            return finalResult
         }
 
     member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<LogEntry<'Item> seq, LogError>> =
@@ -190,7 +193,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
             let! transactionId = kafkaTopic.BeginTransaction()
             
             try
-                let mutable position:int option = None
+                let mutable position:int64 option = None
 
                 for event in newEvents do
                     let! positionResult = kafkaTopic.Add(partitionId, event) 
