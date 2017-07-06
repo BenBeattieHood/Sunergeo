@@ -23,6 +23,9 @@ let main argv =
             Console.WriteLine (sprintf "%O: %s" logLevel message)
         )
 
+    sprintf "Starting server..."
+    |> Console.WriteLine
+
     let snapshotStoreConfig:KeyValueStorageConfig = 
         {
             Uri = Uri("localhost:3000")
@@ -31,6 +34,9 @@ let main argv =
         }
 
     use snapshotStore = new KeyValueStore<Sunergeo.Examples.Turtle.TurtleId, Snapshot<Sunergeo.Examples.Turtle.Turtle>>(snapshotStoreConfig)
+
+    sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
+    |> Console.WriteLine
 
     let eventSourceConfig:EventSourceConfig<Sunergeo.Examples.Turtle.TurtleId, Sunergeo.Examples.Turtle.Turtle, Sunergeo.Examples.Turtle.TurtleEvent> = 
         {
@@ -42,6 +48,9 @@ let main argv =
         }
     
     use eventSource = new Sunergeo.EventSourcing.EventSource<Sunergeo.Examples.Turtle.TurtleId, Sunergeo.Examples.Turtle.Turtle, Sunergeo.Examples.Turtle.TurtleEvent>(eventSourceConfig)
+
+    sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
+    |> Console.WriteLine
 
     let commandWebHostConfig:CommandWebHostConfig<Sunergeo.Examples.Turtle.TurtleEvent> = 
         {
@@ -67,6 +76,9 @@ let main argv =
         commandWebHostConfig
         |> CommandWebHost.create
 
+    sprintf "Serving commands : %O" commandWebHostConfig.BaseUri
+    |> Console.WriteLine
+
     let queryWebHostConfig:QueryWebHostConfig = 
         {
             Logger = logger
@@ -81,7 +93,12 @@ let main argv =
         queryWebHostConfig
         |> QueryWebHost.create
 
+    sprintf "Serving queries : %O" queryWebHostConfig.BaseUri
+    |> Console.WriteLine
+    
+    sprintf "Servers ready. Press enter to quit..."
+    |> Console.WriteLine
+
     System.Console.ReadLine() |> ignore
-
-
+    
     0 // return an integer exit code
