@@ -44,6 +44,13 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
     let conn = Kafka.connHost "localhost:9092"
     let producerMap : Map<'PartitionId, Producer> = Map.empty
 
+    let consumerFunc (state:ConsumerState) (messageSet:ConsumerMessageSet): Async<unit> = 
+        async {
+                printfn "member_id=%s topic=%s partition=%i" state.memberId messageSet.topic messageSet.partition
+                printfn "%s" (System.Text.Encoding.ASCII.GetString messageSet.messageSet.messages.[0].message.value.Array)
+        }
+
+
     let createProducer (partitionId: 'PartitionId) =
         let producerCfg =
               ProducerConfig.create (
@@ -92,19 +99,66 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             return (int64)result.offset |> Result.Ok
         }
 
-    member this.ReadFrom(partitionId: 'PartitionId, positionId: int): Async<Result<LogEntry<'Item> seq, LogError>> =
+    member this.ReadFrom(partitionId: 'PartitionId, positionId: int64): Async<Result<LogEntry<'Item> seq, LogError>> =
         async {
-            let result =
-                eventSource
-                |> Map.tryFind partitionId
-                |> function
-                    | Some items ->
-                        items
-                        |> Seq.skip positionId
-                    | None ->
-                        upcast [] 
 
-            return result |> Result.Ok
+
+            let consumerOffsets =
+              Consumer.fetchOffsets conn "turtle-group" [||]
+              |> Async.RunSynchronously
+
+            //consumer            
+            let group = "turtle-group"
+            let topic = "turtle"
+
+            let consumerConfig = 
+                ConsumerConfig.create (
+                  groupId = group, 
+                  topic = topic, 
+                  autoOffsetReset = AutoOffsetReset.StartFromTime Time.EarliestOffset,
+                  fetchMaxBytes = 1000000,
+                  fetchMinBytes = 1,
+                  fetchMaxWaitMs = 1000,
+                  fetchBufferSize = 1,
+                  sessionTimeout = 30000,
+                  heartbeatFrequency = 3,
+                  checkCrc = true,
+                  endOfTopicPollPolicy = RetryPolicy.constantMs 1000
+                )
+
+            let consumer =
+              Consumer.create conn consumerConfig
+
+            // commit on every message set
+            let mutable mutableSet:ConsumerMessageSet = new ConsumerMessageSet()
+
+            let r = Consumer.consume consumer consumerFunc // |> Async.RunSynchronously
+            // printf "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP"
+
+            //Consumer.consume consumer 
+            //  (fun (state:ConsumerState) (messageSet:ConsumerMessageSet) -> async {
+            //    printfn "member_id=%s topic=%s partition=%i" state.memberId messageSet.topic messageSet.partition
+            //    //do! Consumer.commitOffsets consumer (ConsumerMessageSet.commitPartitionOffsets messageSet) 
+            //    mutableSet <- messageSet
+            //    })
+            //|> Async.RunSynchronously
+            
+            let error = LogError.Error "Bah bow"
+            let errorResult = Result.Error error
+
+            return errorResult
+
+            //let result =
+            //    eventSource
+            //    |> Map.tryFind partitionId
+            //    |> function
+            //        | Some items ->
+            //            items
+            //            |> Seq.skip positionId
+            //        | None ->
+            //            upcast [] 
+
+            //return result |> Result.Ok
         }
 
     member this.ReadLast(partitionId: 'PartitionId): Async<Result<LogEntry<'Item> option, LogError>> =
