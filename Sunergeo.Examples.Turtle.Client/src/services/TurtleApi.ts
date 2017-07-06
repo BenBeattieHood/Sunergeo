@@ -1,4 +1,4 @@
-import { TurtleId, Turtle } from './serverDataTypes';
+import { TurtleId, Turtle, Direction, Position } from './serverDataTypes';
 import * as Promise from 'bluebird';
 import { RestApiV2 } from './RestApi';
 
@@ -19,12 +19,64 @@ export class TurtleApi {
         uri: `/api/turtle/${id}`,
         r: result => result as Turtle
     })
+    
+    // getAll = () => 
+    // this.restApi.get({
+    //     uri: `/`,
+    //     r: result => {
+    //        return [
+    //         {
+    //             turtleId: "1",
+    //             direction: Direction.North,
+    //             positions: [{
+    //                 x: 1,
+    //                 y: -1
+    //             }],
+    //             isVisible: true
+    //         },
+    //         {
+    //             turtleId: "2",
+    //             direction: Direction.North,
+    //             positions: [{
+    //                 x: 1,
+    //                 y: -1
+    //             }],
+    //             isVisible: true
+    //         }
+    //        ]
+    //     }
+    // })
 
-    getAll = () => 
-    this.restApi.get({
-        uri: `/api/turtles`,
-        r: result => result as Turtle[]
-    })
+    getAll = () => {
+            return new Promise((resolve,reject) => {
+                resolve ([
+                    {
+                        turtleId: "1",
+                        direction: Direction.North,
+                        positions: [{
+                            x: 1,
+                            y: -1
+                        }],
+                        isVisible: true
+                    },
+                    {
+                        turtleId: "2",
+                        direction: Direction.North,
+                        positions: [{
+                            x: 1,
+                            y: -1
+                        }],
+                        isVisible: true
+                    }
+                ]);
+            })
+    }
+
+    // getAll = () => 
+    // this.restApi.get({
+    //     uri: `/api/turtles`,
+    //     r: result => result as Turtle[]
+    // })
 
     create = ():Promise<TurtleId> => 
     this.restApi.post({

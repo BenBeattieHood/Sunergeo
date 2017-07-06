@@ -19,6 +19,8 @@ import { FlexBox } from '../common/FlexBox';
 import { MessageBox } from '../messageBoxModal/index'
 import { TextField } from '../common/TextField';
 
+const turtleImage = require('./turtle.png');
+
 namespace BaseStyles {
     export const root = Styles.compose(
     )
@@ -30,11 +32,11 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
         ""
         );
 
-    loadTurtles = () => {
+    componentWillMount() {
         this.props.actions.updateIsLoading(true);
         this.turtleApi.getAll()
-        .then(results => {
-            _.forEach(results, result => this.props.actions.addTurtle);
+        .then(turtles => {
+            _.forEach(turtles, this.props.actions.addTurtle);
             this.props.actions.updateIsLoading(false);
         })
         .catch((error:Error) => {
@@ -45,18 +47,6 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
             });
             this.props.actions.serverErrored()
         })
-    }
-
-    componentWillMount() {
-        this.turtleApi
-        .getAll()
-        .catch((error:Error) => {
-            this.props.actions.addAlertMessage({
-                type: 'Error',
-                message: error.message
-            });
-        })
-        .then(this.props.actions.addTagsFromServer)
     }
 
     renderAlertMessage() {
@@ -73,7 +63,7 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
     canvasElement:HTMLCanvasElement | null = null;
 
     render() {
-        if (this.props.turtles.isLoading) {
+        if (this.props.serverEntities.isLoading) {
             return (
                 <Loader
                     visible={true}
@@ -87,15 +77,42 @@ class JournalsPage extends ReduxUtils.ReduxContainer<{}, ReduxState, ReduxAction
                     <div
                         className="container"
                         >
+                        {this.renderAlertMessage()}
                         <div>
                             <canvas
                                 ref={el => this.canvasElement = el}
+                                width="800px"
+                                height="800px"
                                 />
                         </div>
                     </div>
                 </div>
             </div>
         );
+    }
+
+    componentDidMount() {
+        this.rerenderTurtles();
+    }
+
+    componentDidUpdate() {
+        this.rerenderTurtles();
+    }
+
+    rerenderTurtles() {
+        if (this.canvasElement !== null) {
+            var context = this.canvasElement.getContext('2d'); 
+                _.forEach(this.props.serverEntities.turtles, turtle => {
+                    var imageObj = new Image();
+
+                    imageObj.onload = function() {                        
+                        if (context !== null) {
+                            context.drawImage(imageObj, turtle.positions[turtle.positions.length -1].x, turtle.positions[turtle.positions.length -1].y);
+                        }
+                    };
+                    imageObj.src = turtleImage;
+                });
+        }
     }
 }
 

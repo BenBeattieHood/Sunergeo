@@ -11,6 +11,7 @@ var config = {
     resolve: {
         extensions: ['.ts', '.tsx', '.js', '.jsx']
     },
+    devtool: 'source-map',
     module: {
         loaders: [
             {
@@ -21,6 +22,13 @@ var config = {
             {
                 test: /\.css$/,
                 loader: ['style-loader', 'css-loader']
+            },
+            {
+                test: /\.(jpg|png|svg)$/,
+                loader: 'file-loader',
+                options: {
+                    name: '[path][name].[hash].[ext]',
+                }
             },
             {
                 test: /\.(woff2?|[ot]tf|eot|svg)$/,

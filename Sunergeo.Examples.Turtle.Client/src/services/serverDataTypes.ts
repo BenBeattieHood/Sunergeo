@@ -1,8 +1,8 @@
 export type TurtleId = number
 
 export interface Position {
-    X: number,
-    Y: number
+    x: number,
+    y: number
 }
 
 export enum Direction {
@@ -14,6 +14,7 @@ export enum Direction {
 
 export interface Turtle {
     turtleId: TurtleId,
-    position: Position,
-    direction: Direction
+    positions: Position[],
+    direction: Direction,
+    isVisible: boolean
 }
