@@ -10,15 +10,9 @@ open Routing
 //    LogName: string
 //}
 
-type RoutedCommand<'Command, 'Events> = RoutedType<'Command, 'Events seq>
+type RoutedCommand<'Command, 'State, 'Events> = RoutedType<'Command, CommandResult<'State, 'Events>>
 
-type CommandHandler<'Events> = RoutedTypeRequestHandler<'Events seq>
-
-type CommandWebHostStartupConfig<'Events> = {
-    Logger: Sunergeo.Logging.Logger
-    Handlers: CommandHandler<'Events> list
-    OnHandle: (('Events seq) -> unit)
-}
+type CommandHandler<'State, 'Events> = RoutedTypeRequestHandler<CommandResult<'State, 'Events>>
 
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Hosting
@@ -27,8 +21,14 @@ open Microsoft.AspNetCore.Http
 open Sunergeo.Logging
 open Microsoft.Extensions.DependencyInjection
 
+type CommandWebHostStartupConfig<'State, 'Events> = {
+    Logger: Sunergeo.Logging.Logger
+    ContextProvider: HttpContext -> Context
+    Handlers: CommandHandler<'State, 'Events> list
+    OnHandle: CommandResult<'State, 'Events> -> unit
+}
 
-type CommandWebHostStartup<'Events> (config: CommandWebHostStartupConfig<'Events>) = 
+type CommandWebHostStartup<'State, 'Events> (config: CommandWebHostStartupConfig<'State, 'Events>) = 
 
     member x.Configure 
         (
@@ -41,11 +41,13 @@ type CommandWebHostStartup<'Events> (config: CommandWebHostStartupConfig<'Events
                 sprintf "Received %O" ctx.Request.Path
                 |> config.Logger Sunergeo.Logging.LogLevel.Information
 
+                let context = ctx |> config.ContextProvider
+
                 let result =
                     config.Handlers
                     |> List.tryPick
                         (fun handler ->
-                            handler ctx.Request
+                            handler context ctx.Request
                         )
                         
                 result
@@ -62,17 +64,17 @@ type CommandWebHostStartup<'Events> (config: CommandWebHostStartupConfig<'Events
 
         app.Run(RequestDelegate(reqHandler))
 
-type CommandWebHostConfig<'Events> = {
+type CommandWebHostConfig<'State, 'Events> = {
     Logger: Sunergeo.Logging.Logger
-    Commands: RoutedCommand<obj, 'Events> list
-    OnHandle: (('Events seq) -> unit)
+    Commands: RoutedCommand<obj, 'State, 'Events> list
+    OnHandle: CommandResult<'State, 'Events> -> unit
     BaseUri: Uri
 }
 
 module CommandWebHost =
-    let toGeneralRoutedCommand<'Command, 'Events>
-        (command: RoutedCommand<'Command, 'Events>)
-        :RoutedCommand<obj, 'Events> =
+    let toGeneralRoutedCommand<'Command, 'State, 'Events>
+        (command: RoutedCommand<'Command, 'State, 'Events>)
+        :RoutedCommand<obj, 'State, 'Events> =
         {
             RoutedCommand.PathAndQuery = command.PathAndQuery
             RoutedCommand.HttpMethod = command.HttpMethod
@@ -82,12 +84,12 @@ module CommandWebHost =
                 )
         }
 
-    let create (config: CommandWebHostConfig<'Events>): IWebHost =
+    let create<'State, 'Events> (config: CommandWebHostConfig<'State, 'Events>): IWebHost =
         let handlers = 
             config.Commands
             |> List.map Routing.createHandler
             
-        let startupConfig:CommandWebHostStartupConfig<'Events> =
+        let startupConfig:CommandWebHostStartupConfig<'State, 'Events> =
             {
                 Logger = config.Logger
                 Handlers = handlers
@@ -95,9 +97,9 @@ module CommandWebHost =
             }
 
         WebHostBuilder()
-            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig<'Events>>(startupConfig) |> ignore)
+            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig<'State, 'Events>>(startupConfig) |> ignore)
             .UseKestrel()
-            .UseStartup<CommandWebHostStartup<'Events>>()
+            .UseStartup<CommandWebHostStartup<'State, 'Events>>()
             .UseUrls(config.BaseUri |> string)
             .Build()
       

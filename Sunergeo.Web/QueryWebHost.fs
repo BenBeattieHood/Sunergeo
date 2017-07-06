@@ -24,6 +24,7 @@ type QueryHandler = RoutedTypeRequestHandler<obj>
 
 type QueryWebHostStartupConfig = {
     Logger: Sunergeo.Logging.Logger
+    ContextProvider: HttpContext -> Context
     Handlers: QueryHandler list
 }
 
@@ -40,14 +41,28 @@ type QueryWebHostStartup (config: QueryWebHostStartupConfig) =
                 sprintf "Received %O" ctx.Request.Path
                 |> config.Logger Sunergeo.Logging.LogLevel.Information
 
-                //let result =
-                //    config.Handlers
-                //    |> List.tryPick
-                //        (fun handler ->
-                //            handler ctx.Request
-                //        )
-                        
+                let context = ctx |> config.ContextProvider
 
+                let result =
+                    config.Handlers
+                    |> List.tryPick
+                        (fun handler ->
+                            handler context ctx.Request
+                        )
+                       
+                result
+                |> WebHost.processResultFor ctx.Response
+                    (fun result ->
+                        if result = null
+                        then
+                            null, StatusCodes.Status204NoContent
+                        else
+                            result, StatusCodes.Status200OK
+                        |> Some
+                    )
+                    (fun logLevel message -> 
+                        config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
+                    )
 
 
             } |> Async.StartAsTask :> Task

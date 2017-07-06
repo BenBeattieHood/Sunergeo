@@ -14,7 +14,7 @@ type RoutedType<'TargetType, 'Result> = {
 }
 
 type RoutedTypeRequestHandler<'Result> = 
-    Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error> option
+    Context -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error> option
 
 
 let routePathAndQueryVariableRegex = Regex(@"\{(.+?)\}", RegexOptions.Compiled)

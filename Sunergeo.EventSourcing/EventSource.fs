@@ -196,13 +196,14 @@ type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(c
     let kafkaTopic = new LogTopic<'PartitionId, EventLogItem<'PartitionId, 'Events>>(logConfig)
     
     let rec exec
+        (partitionId: 'PartitionId)
         (context: Context) 
         (fold: 'State -> 'Events -> 'State)
-        (command: ICommandBase<'PartitionId>)
+        (commandResult: CommandResult<'State, 'Events>)
         :Async<Result<unit, Error>> =
         
         async {
-            let partitionId = command.GetId context
+            //let partitionId = command.GetId context
             let snapshotAndVersionResult = config.SnapshotStore.Get partitionId
 
             let snapshotAndVersion =
@@ -210,12 +211,8 @@ type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(c
                 |> ResultModule.get
                 
             let newState, newEvents, version =
-                match command, snapshotAndVersion with
-                | :? ICreateCommand<'PartitionId, 'State, 'Events> as createCommand, None ->
-                    let newState, newEvents = 
-                        createCommand.Exec context 
-                        |> ResultModule.get
-
+                match commandResult, snapshotAndVersion with
+                | CommandResult.Create (newState, newEvents), None ->
                     let newEvents = seq {
                         yield 
                             {
@@ -229,19 +226,17 @@ type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(c
                     }
 
                     newState, newEvents, None
-                | :? ICommand<'PartitionId, 'State, 'Events> as command, Some (snapshot, version) ->
-                    let newEvents = 
-                        snapshot.State
-                        |> command.Exec context
-                        |> ResultModule.get
-
+                | CommandResult.Update newEvents, Some (snapshot, version) ->
                     let newState = 
                         newEvents
                         |> Seq.fold fold snapshot.State
 
                     newState, (newEvents |> Seq.map EventLogItem.Event), (version |> Some)
-                | _ ->
+
+                | _ -> 
                     failwith "uhoh"
+                //| CommandResult.Create _, Some state ->
+                //    let asd = ("" |> Error.InvalidOp |> Result.Error)
                     
                     
             let! transactionId = kafkaTopic.BeginTransaction()
@@ -294,9 +289,9 @@ type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(c
     //                (fun x -> Sunergeo.Core.Todo.todo())
     //    }
 
-    member this.Exec(context: Context, command: ICommandBase<'PartitionId>, fold: 'State -> 'Events-> 'State):Async<Result<unit, Error>> =
-        command
-        |> exec context fold
+    member this.Exec(partitionId: 'PartitionId, context: Context, commandResult: CommandResult<'State, 'Events>, fold: 'State -> 'Events-> 'State):Async<Result<unit, Error>> =
+        commandResult
+        |> exec partitionId context fold
         
     interface System.IDisposable with
         member this.Dispose() =

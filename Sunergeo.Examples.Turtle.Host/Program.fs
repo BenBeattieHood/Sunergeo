@@ -51,21 +51,36 @@ let main argv =
 
     sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
     |> Console.WriteLine
+    
+//type RoutedType<'TargetType, 'Result> = {
+//    PathAndQuery: string
+//    HttpMethod: HttpMethod
+//    Exec: 'TargetType -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error>
+//}RoutedType<'Command, CommandResult<'State, 'Events>>
 
-    let commandWebHostConfig:CommandWebHostConfig<Sunergeo.Examples.Turtle.TurtleEvent> = 
+    let commandWebHostConfig:CommandWebHostConfig<Sunergeo.Examples.Turtle.Turtle, Sunergeo.Examples.Turtle.TurtleEvent> = 
         {
             Logger = logger
             BaseUri = Uri("http://localhost:8080")
             Commands = 
                 [
-                    //PathAndQuery: string
-                    //HttpMethod: HttpMethod
-                    //Exec: 'TargetType -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error>
-                    //                RoutedCommand<CreateCommand, TurtleEvent>.PathA
+                    {
+                        RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.PathAndQuery
+                        RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.HttpMethod
+                        RoutedCommand.Exec = 
+                            (fun (command: CreateCommand) ->
+                                (command :> ICreateCommand).Exec
+                            )
+                    }
                 ]
                 |> List.map CommandWebHost.toGeneralRoutedCommand
             OnHandle = 
-                (fun events ->
+                (fun result ->
+                    match result with
+                    | CommandResult.Create (state, events) ->
+                        ()
+                    | CommandResult.Update events ->
+                        ()
                     //events
                     //|> eventSource.Exec
                     ()

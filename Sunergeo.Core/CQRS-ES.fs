@@ -26,6 +26,11 @@ type ICommand<'Id, 'State, 'Event when 'Id : comparison> =
     inherit ICommandBase<'Id>
     abstract Exec: Context -> 'State -> Result<'Event seq, Error>
     
+    
+type CommandResult<'State, 'Events> =
+    Create of ('State) * ('Events seq)
+    | Update of 'Events seq
+
 
 module Utils =    
     let toTopic<'State>
