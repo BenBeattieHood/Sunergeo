@@ -1,7 +1,12 @@
-﻿namespace Sunergeo.Examples.Turtle
+﻿namespace Sunergeo.Examples.Turtle.Commands
 
 open Sunergeo.Core
 open Sunergeo.Web
+
+open Sunergeo.Examples.Turtle.Core
+open Sunergeo.Examples.Turtle.Events
+open Sunergeo.Examples.Turtle.State
+open Sunergeo.Examples.Turtle.Aggregate
 
 // Commands
 

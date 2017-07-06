@@ -10,11 +10,18 @@ open Sunergeo.Web
 open Sunergeo.Web.Commands
 open Sunergeo.Web.Queries
 open Sunergeo.Examples.Turtle
+
 open ResultModule
+
+open Sunergeo.Examples.Turtle.Core
+open Sunergeo.Examples.Turtle.Events
+open Sunergeo.Examples.Turtle.State
+open Sunergeo.Examples.Turtle.Aggregate
+open Sunergeo.Examples.Turtle.Commands
 
 [<EntryPoint>]
 let main argv = 
-    //let assemblies = [typeof<Sunergeo.Examples.Turtle.Turtle>.Assembly]
+    //let assemblies = [typeof<Turtle>.Assembly]
 
     let instanceId:InstanceId = "123"
 
@@ -30,24 +37,24 @@ let main argv =
         {
             Uri = Uri("localhost:3000")
             Logger = logger
-            TableName = instanceId |> Utils.toTopic<Sunergeo.Examples.Turtle.Turtle>
+            TableName = instanceId |> Utils.toTopic<Turtle>
         }
 
-    use snapshotStore = new KeyValueStore<Sunergeo.Examples.Turtle.TurtleId, Snapshot<Sunergeo.Examples.Turtle.Turtle>>(snapshotStoreConfig)
+    use snapshotStore = new KeyValueStore<TurtleId, Snapshot<Turtle>>(snapshotStoreConfig)
 
     sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
     |> Console.WriteLine
 
-    let eventSourceConfig:EventSourceConfig<Sunergeo.Examples.Turtle.TurtleId, Sunergeo.Examples.Turtle.Turtle, Sunergeo.Examples.Turtle.TurtleEvent> = 
+    let eventSourceConfig:EventSourceConfig<TurtleId, Turtle, TurtleEvent> = 
         {
             InstanceId = instanceId
-            Fold = Sunergeo.Examples.Turtle.Turtle.fold
+            Fold = Turtle.fold
             SnapshotStore = snapshotStore
             LogUri = Uri("localhost:9092")
             Logger = logger
         }
     
-    use eventSource = new Sunergeo.EventSourcing.EventSource<Sunergeo.Examples.Turtle.TurtleId, Sunergeo.Examples.Turtle.Turtle, Sunergeo.Examples.Turtle.TurtleEvent>(eventSourceConfig)
+    use eventSource = new Sunergeo.EventSourcing.EventSource<TurtleId, Turtle, TurtleEvent>(eventSourceConfig)
 
     sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
     |> Console.WriteLine
@@ -58,7 +65,7 @@ let main argv =
 //    Exec: 'TargetType -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error>
 //}RoutedType<'Command, CommandResult<'State, 'Events>>
 
-    let commandWebHostConfig:CommandWebHostConfig<Sunergeo.Examples.Turtle.Turtle, Sunergeo.Examples.Turtle.TurtleEvent> = 
+    let commandWebHostConfig:CommandWebHostConfig<State.Turtle, TurtleEvent> = 
         {
             Logger = logger
             BaseUri = Uri("http://localhost:8080")

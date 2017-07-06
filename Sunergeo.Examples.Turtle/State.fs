@@ -1,19 +1,8 @@
-﻿namespace Sunergeo.Examples.Turtle
+﻿namespace Sunergeo.Examples.Turtle.State
 
-open Sunergeo.Core
+open Sunergeo.Examples.Turtle.Core
 
 // State
-
-type Direction = 
-    | North
-    | East
-    | South
-    | West
-
-type Position = {
-    X: int
-    Y: int
-}
 
 type Turtle = {
     TurtleId: TurtleId

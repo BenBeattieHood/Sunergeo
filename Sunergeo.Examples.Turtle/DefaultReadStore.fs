@@ -1,14 +1,18 @@
-﻿namespace Sunergeo.Examples.Turtle.Aggregate
+﻿namespace Sunergeo.Examples.Turtle.ReadStore
 
 open Sunergeo.Core
 open Sunergeo.Examples.Turtle.Core
 open Sunergeo.Examples.Turtle.Events
-open Sunergeo.Examples.Turtle.State
 
-// Events -> State
+module DefaultReadStore =
 
-[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
-module Turtle =
+    type Turtle = {
+        TurtleId: TurtleId
+        Direction: Direction
+        Position: Position list
+        IsVisible: bool
+    }
+    
     let create
         (context: Context)
         (turtleId: TurtleId)
@@ -16,7 +20,7 @@ module Turtle =
         {
             TurtleId = turtleId
             Direction = Direction.North
-            Position = { X = 0; Y = 0 }
+            Position = [{ X = 0; Y = 0 }]
             IsVisible = true
         }
 
@@ -35,9 +39,15 @@ module Turtle =
             }
         | MovedForwards event ->
             { state with
-                Position = (state.Position, state.Direction) |> Utils.move
+                Position = 
+                    state.Position
+                    |> List.append
+                        [(state.Position |> List.head, state.Direction) |> Utils.move]
             }
         | VisibilitySet event ->
             { state with
                 IsVisible = event.IsVisible
             }
+
+
+

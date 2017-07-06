@@ -1,6 +1,7 @@
-﻿namespace Sunergeo.Examples.Turtle
+﻿namespace Sunergeo.Examples.Turtle.Events
 
 open Sunergeo.Core
+open Sunergeo.Examples.Turtle.Core
 
 // Events
 
@@ -28,3 +29,12 @@ type VisibilitySetEvent =
         IsVisible: bool
     }
     interface IEvent
+
+
+// Events DU
+
+type TurtleEvent =
+    | TurnedLeft of TurnedLeftEvent
+    | TurnedRight of TurnedRightEvent
+    | MovedForwards of MovedForwardsEvent
+    | VisibilitySet of VisibilitySetEvent
