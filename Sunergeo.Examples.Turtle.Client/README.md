@@ -15,4 +15,4 @@ yarn install
 
 ## Build
 
-Run `yarn run build` to build, or `yarn run start` to run
+Run `yarn build` to build, or `yarn start` (or `yarn start-https`) to run @ `localhost:8042/index.html`

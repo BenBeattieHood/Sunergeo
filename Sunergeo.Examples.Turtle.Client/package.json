@@ -4,6 +4,7 @@
     "scripts": {
         "build": "webpack",
         "start": "webpack-dev-server ./webpack.config.tsx",
+        "start-https": "webpack-dev-server ./webpack.config.tsx --https",
         "test": "karma start --single-run",
         "test-debug": "karma start karma.conf.ts --browsers=Chrome --single-run=false --debug"
     },

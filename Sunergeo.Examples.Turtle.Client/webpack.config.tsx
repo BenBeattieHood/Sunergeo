@@ -36,7 +36,8 @@ var config = {
     devServer: {
         contentBase: path.resolve(__dirname, 'build'),
         port: 8042,
-        inline: false
+        inline: false,
+        //https: true
     }
 };
 
