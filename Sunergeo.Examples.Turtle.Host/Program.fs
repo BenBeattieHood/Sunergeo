@@ -2,7 +2,9 @@
 // See the 'F# Tutorial' project for more help.
 
 open System
+open Sunergeo.Core
 open Sunergeo.EventSourcing
+open Sunergeo.KeyValueStorage
 open Sunergeo.Logging
 open Sunergeo.Web
 open Sunergeo.Web.Commands
@@ -11,61 +13,72 @@ open ResultModule
 
 [<EntryPoint>]
 let main argv = 
-    let assemblies = [typeof<Sunergeo.Examples.Turtle.Turtle>.Assembly]
-    let config:CommandWebHostConfig = {
-        Logger = 
-            (fun (logLevel: LogLevel) (message: string) ->
-                System.Console.WriteLine message
-            )
-        BaseUri = Uri("http://localhost:8080")
-        Commands = []
-    }
+    //let assemblies = [typeof<Sunergeo.Examples.Turtle.Turtle>.Assembly]
 
-    //use host = 
-    //    config
-    //    |> CommandWebHost.create
+    let instanceId:InstanceId = "123"
 
-    let logConfig:LogConfig = {
-        Uri = "localhost:9092"
-        Topic = "turtle"
-    }
+    let logger =
+        (fun (logLevel: LogLevel) (message: string) ->
+            Console.WriteLine (sprintf "%O: %s" logLevel message)
+        )
 
-    let logTopic = new LogTopic<int, Object>(logConfig)
+    let snapshotStoreConfig:KeyValueStorageConfig = 
+        {
+            Uri = Uri("localhost:3000")
+            Logger = logger
+            TableName = instanceId |> Utils.toTopic<Sunergeo.Examples.Turtle.Turtle>
+        }
 
-    let evt = TurnedLeft {
-        TurtleId = Guid.NewGuid().ToString()
-    }
+    use snapshotStore = new KeyValueStore<Sunergeo.Examples.Turtle.TurtleId, Snapshot<Sunergeo.Examples.Turtle.Turtle>>(snapshotStoreConfig)
 
-    let asyncResult = 
-        async {
-            let! result1 = logTopic.Add(0, evt)
-            match result1 with
-            | Result.Ok offset -> printfn "%i" offset
-            | Result.Error e -> printf "Error of some kind"
-
-            return result1
+    let eventSourceConfig:EventSourceConfig<Sunergeo.Examples.Turtle.TurtleId, Sunergeo.Examples.Turtle.Turtle, Sunergeo.Examples.Turtle.TurtleEvent> = 
+        {
+            InstanceId = instanceId
+            Fold = Sunergeo.Examples.Turtle.Turtle.fold
+            SnapshotStore = snapshotStore
+            LogUri = Uri("localhost:9092")
+            Logger = logger
         }
     
-    let addEventResult: Result<int64, LogError> = 
-        asyncResult
-        |> Async.RunSynchronously
+    use eventSource = new Sunergeo.EventSourcing.EventSource<Sunergeo.Examples.Turtle.TurtleId, Sunergeo.Examples.Turtle.Turtle, Sunergeo.Examples.Turtle.TurtleEvent>(eventSourceConfig)
 
-    match addEventResult with
-    | Result.Error _ -> printf "Result is error" |> ignore
-    | Result.Ok offset ->
-                    let outerResult2 = 
-                        async {
-                            let! readResult = logTopic.ReadFrom(0, offset)
-                            match readResult with
-                            | Result.Ok r -> printfn "got %d entries" (Seq.length r)
-                            | Result.Error _ -> printfn "error"
-                            return readResult
-                        }
-    
-                    let result2 = 
-                        outerResult2
-                        |> Async.RunSynchronously 
-                    printf "hello world" |> ignore
+    let commandWebHostConfig:CommandWebHostConfig<Sunergeo.Examples.Turtle.TurtleEvent> = 
+        {
+            Logger = logger
+            BaseUri = Uri("http://localhost:8080")
+            Commands = 
+                [
+                    //PathAndQuery: string
+                    //HttpMethod: HttpMethod
+                    //Exec: 'TargetType -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error>
+                    //                RoutedCommand<CreateCommand, TurtleEvent>.PathA
+                ]
+                |> List.map CommandWebHost.toGeneralRoutedCommand
+            OnHandle = 
+                (fun events ->
+                    //events
+                    //|> eventSource.Exec
+                    ()
+                )
+        }
+
+    use commandWebHost = 
+        commandWebHostConfig
+        |> CommandWebHost.create
+
+    let queryWebHostConfig:QueryWebHostConfig = 
+        {
+            Logger = logger
+            Queries = 
+                [
+                ]
+                |> List.map QueryWebHost.toGeneralRoutedQuery
+            BaseUri = Uri("http://localhost:8081")
+        }
+
+    use queryWebHost =
+        queryWebHostConfig
+        |> QueryWebHost.create
 
     System.Console.ReadLine() |> ignore
 

@@ -51,7 +51,10 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Routing.fs" />
+    <Compile Include="WebHost.fs" />
     <Compile Include="CommandWebHost.fs" />
+    <Compile Include="QueryWebHost.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

@@ -1,5 +1,6 @@
 ﻿namespace Sunergeo.EventSourcing
 
+open System
 open System.Text
 open Sunergeo.Core
 open Sunergeo.KeyValueStorage
@@ -16,7 +17,7 @@ type EventSourceConfig<'PartitionId, 'State, 'Events when 'PartitionId : compari
     InstanceId: InstanceId
     Fold: 'State -> 'Events -> 'State
     SnapshotStore: Sunergeo.KeyValueStorage.KeyValueStore<'PartitionId, Snapshot<'State>>
-    LogUri: string
+    LogUri: Uri
     Logger: Sunergeo.Logging.Logger
 }
 
@@ -26,7 +27,7 @@ type LogEntry<'Item> = {
 }
 
 type LogConfig = {
-    Uri: string // placeholder
+    Uri: Uri
     Topic: string
 }
 
@@ -41,7 +42,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
     let mutable eventSource:Map<'PartitionId, LogEntry<'Item> seq> = Map.empty /// TODO: replace with kafka with enable.idempotence=true
     let toAsync (a:'a): Async<'a> = async { return a }
 
-    let conn = Kafka.connHost "localhost:9092"
+    let kafkaConnection = Kafka.connHost (sprintf "%s:%i" config.Uri.Host config.Uri.Port)
     let producerMap : Map<'PartitionId, Producer> = Map.empty
 
     let consumerFunc (state:ConsumerState) (messageSet:ConsumerMessageSet): Async<unit> = 
@@ -59,7 +60,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
                 requiredAcks = RequiredAcks.Local)
 
         let producer =
-            Producer.createAsync conn producerCfg
+            Producer.createAsync kafkaConnection producerCfg
             |> Async.RunSynchronously
 
         producer
@@ -87,9 +88,13 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
 
     member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int64, LogError>> =
         async {
-            let producer = match producerMap.ContainsKey partitionId with
-                            | true -> producerMap.[partitionId]
-                            | false -> addProducerToMap partitionId            
+            let producer = 
+                producerMap
+                |> Map.tryFind partitionId
+                |> Option.defaultWith
+                    (fun _ ->
+                        addProducerToMap partitionId 
+                    )           
 
             let jsonSerializer = JsonConvert.SerializeObject >> Encoding.ASCII.GetBytes
             let serializedItem = jsonSerializer item
@@ -104,7 +109,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
 
 
             let consumerOffsets =
-              Consumer.fetchOffsets conn "turtle-group" [||]
+              Consumer.fetchOffsets kafkaConnection "turtle-group" [||]
               |> Async.RunSynchronously
 
             //consumer            
@@ -127,7 +132,7 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
                 )
 
             let consumer =
-              Consumer.create conn consumerConfig
+              Consumer.create kafkaConnection consumerConfig
 
             // commit on every message set
             let mutable mutableSet:ConsumerMessageSet = new ConsumerMessageSet()
@@ -172,9 +177,13 @@ type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogCon
             return result |> Result.Ok
         }
         
+    interface System.IDisposable with
+        member this.Dispose() =
+            kafkaConnection.Close()
+        
         
 
-type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(config: EventSourceConfig<'PartitionId, 'State, 'Events>) = 
+type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: EventSourceConfig<'PartitionId, 'State, 'Events>) = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
@@ -184,7 +193,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
         Uri = config.LogUri
     }
 
-    let kafkaTopic = LogTopic<'PartitionId, EventLogItem<'PartitionId, 'Events>>(logConfig)
+    let kafkaTopic = new LogTopic<'PartitionId, EventLogItem<'PartitionId, 'Events>>(logConfig)
     
     let rec exec
         (context: Context) 
@@ -288,3 +297,7 @@ type EventSource<'State, 'Events, 'PartitionId when 'PartitionId : comparison>(c
     member this.Exec(context: Context, command: ICommandBase<'PartitionId>, fold: 'State -> 'Events-> 'State):Async<Result<unit, Error>> =
         command
         |> exec context fold
+        
+    interface System.IDisposable with
+        member this.Dispose() =
+            (kafkaTopic :> IDisposable).Dispose()

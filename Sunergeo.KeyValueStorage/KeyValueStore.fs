@@ -7,10 +7,9 @@ open System.Runtime.Serialization.Json
 open System.Text
 
 type KeyValueStorageConfig = {
-    uri: string
-    port: int
-    logger: Sunergeo.Logging.Logger
-    tableName: string
+    Uri: Uri
+    Logger: Sunergeo.Logging.Logger
+    TableName: string
 }
 
 type AerospikeReadError =
@@ -23,13 +22,28 @@ type AerospikeWriteError =
     | Error of String
 
 
-// This type is just a placeholder to represent the approx API offered by Aerospike. A TL;DR of write versions is here https://discuss.aerospike.com/t/locking-a-record-in-aerospike/2152/3
+// A TL;DR of write versions is here https://discuss.aerospike.com/t/locking-a-record-in-aerospike/2152/3
 type Aerospike(config: KeyValueStorageConfig) =
    
     let valueColumnName = "value"
     let db = "test"
     
-    let client = new AerospikeClient(config.uri, config.port)
+    let client = new AerospikeClient(config.Uri.Host, config.Uri.Port)
+
+    let createKey 
+        (key: string)
+        :Key =
+        Key(db, config.TableName, key)
+
+    let createWritePolicy
+        (generation: int)
+        (generationPolicy: GenerationPolicy)
+        :WritePolicy =
+        let writePolicy = WritePolicy()
+        writePolicy.generation <- generation
+        writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL
+        writePolicy
+            
 
     member this.Get
         (
@@ -38,7 +52,7 @@ type Aerospike(config: KeyValueStorageConfig) =
         : Result<(string * int) option, AerospikeReadError> =
         try  // (Database Table Row)
 
-            let keySet = new Key(db, config.tableName, key)
+            let keySet = key |> createKey
             
             client.Get(null, keySet, valueColumnName)
             |> Option.ofObj
@@ -63,11 +77,9 @@ type Aerospike(config: KeyValueStorageConfig) =
         )
         :Result<unit, AerospikeWriteError> =
         try
-            let keySet = new Key(db, config.tableName, key)
+            let keySet = key |> createKey
 
-            let writePolicy = WritePolicy()
-            writePolicy.generation <- 0
-            writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL
+            let writePolicy = createWritePolicy 0 GenerationPolicy.EXPECT_GEN_EQUAL
 
             let binValue = new Bin(valueColumnName, value)
             client.Put(writePolicy, keySet, binValue)
@@ -80,15 +92,13 @@ type Aerospike(config: KeyValueStorageConfig) =
     member this.Delete
         (
             key: string,
-            generation: int
+            version: int
         )
         :Result<unit, AerospikeWriteError> =
         try
-            let keySet = new Key(db, config.tableName, key)
+            let keySet = key |> createKey
 
-            let writePolicy = WritePolicy()
-            writePolicy.generation <- generation
-            writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL
+            let writePolicy = createWritePolicy version GenerationPolicy.EXPECT_GEN_EQUAL
             
             client.Delete(writePolicy, keySet)
             |> ignore
@@ -102,15 +112,13 @@ type Aerospike(config: KeyValueStorageConfig) =
         (
             key: string,
             value: string,
-            generation: int
+            version: int
         )
         :Result<unit, AerospikeWriteError> =
         try
-            let keySet = new Key(db, config.tableName, key)
+            let keySet = key |> createKey
 
-            let writePolicy = WritePolicy()
-            writePolicy.generation <- generation
-            writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL
+            let writePolicy = createWritePolicy version GenerationPolicy.EXPECT_GEN_EQUAL
 
             let binValue = new Bin(valueColumnName, value)
             client.Put(writePolicy, keySet, binValue)

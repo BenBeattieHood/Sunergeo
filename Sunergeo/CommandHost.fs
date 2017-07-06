@@ -12,7 +12,7 @@ type Config = {
     Assemblies: Assembly list
 }
 
-type CommandHost(config: Config) = 
+type CommandHost<'Events>(config: Config) = 
 
     let commands =
         config.Assemblies
@@ -35,9 +35,9 @@ type CommandHost(config: Config) =
                 |> Option.map
                     (fun routeAttribute ->
                         { 
-                            RoutedCommand.PathAndQuery = routeAttribute.PathAndQuery
-                            RoutedCommand.CommandType = command
-                            RoutedCommand.HttpMethod = routeAttribute.HttpMethod
+                            RoutedCommand<>.PathAndQuery = routeAttribute.PathAndQuery
+                            RoutedType.CommandType = command
+                            RoutedType.HttpMethod = routeAttribute.HttpMethod
                         }
                     )
             )

@@ -4,28 +4,31 @@ open System
 open Sunergeo.Core
 open Sunergeo.Web
 
+open Routing
+
 //type LogConfig = {
 //    LogName: string
 //}
 
-type CommandRequestHandler = 
-    Microsoft.AspNetCore.Http.HttpRequest -> (Result<unit, Error> option)
+type RoutedCommand<'Command, 'Events> = RoutedType<'Command, 'Events seq>
 
-type CommandWebHostStartupConfig = {
+type CommandHandler<'Events> = RoutedTypeRequestHandler<'Events seq>
+
+type CommandWebHostStartupConfig<'Events> = {
     Logger: Sunergeo.Logging.Logger
-    Handlers: CommandRequestHandler list
+    Handlers: CommandHandler<'Events> list
+    OnHandle: (('Events seq) -> unit)
 }
-
 
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Http
 open Sunergeo.Logging
-open Microsoft.Extensions.DependencyInjection;
+open Microsoft.Extensions.DependencyInjection
 
 
-type CommandWebHostStartup (config: CommandWebHostStartupConfig) = 
+type CommandWebHostStartup<'Events> (config: CommandWebHostStartupConfig<'Events>) = 
 
     member x.Configure 
         (
@@ -45,196 +48,56 @@ type CommandWebHostStartup (config: CommandWebHostStartupConfig) =
                             handler ctx.Request
                         )
                         
-                match result with
-                | Some (Result.Ok _) ->
-                    ctx.Response.StatusCode <- StatusCodes.Status204NoContent
-                    
-                    sprintf "%O -> %i" ctx.Request.Path ctx.Response.StatusCode
-                    |> config.Logger LogLevel.Information
-
-
-                | Some (Result.Error error) ->
-                    match error.Status with
-                    | ErrorStatus.InvalidOp ->
-                        ctx.Response.StatusCode <- StatusCodes.Status400BadRequest
-                        
-                    | ErrorStatus.PermissionDenied ->
-                        ctx.Response.StatusCode <- StatusCodes.Status401Unauthorized
-
-                    | ErrorStatus.Unknown ->
-                        ctx.Response.StatusCode <- StatusCodes.Status500InternalServerError
-                        
-                    
-                    sprintf "%O -> %i" ctx.Request.Path ctx.Response.StatusCode
-                    |> config.Logger LogLevel.Warning
-
-                    do! ctx.Response.WriteAsync (error.Message) |> Async.AwaitTask
-
-
-                | None ->
-                    ctx.Response.StatusCode <- StatusCodes.Status404NotFound
-
-                    sprintf "%O -> %i" ctx.Request.Path ctx.Response.StatusCode
-                    |> config.Logger LogLevel.Error
-
+                result
+                |> WebHost.processResultFor ctx.Response
+                    (fun events ->
+                        events |> config.OnHandle
+                        None
+                    )
+                    (fun logLevel message -> 
+                        config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
+                    )
 
             } |> Async.StartAsTask :> Task
 
         app.Run(RequestDelegate(reqHandler))
-        
-        
-type RoutedCommand = {
-    PathAndQuery: string
-    HttpMethod: HttpMethod
-    CommandType: Type
-}
 
-type CommandWebHostConfig = {
+type CommandWebHostConfig<'Events> = {
     Logger: Sunergeo.Logging.Logger
-    Commands: RoutedCommand list
+    Commands: RoutedCommand<obj, 'Events> list
+    OnHandle: (('Events seq) -> unit)
     BaseUri: Uri
 }
 
 module CommandWebHost =
-    open System.Text.RegularExpressions
-    
-    let routePathAndQueryVariableRegex = Regex(@"\{(.+?)\}", RegexOptions.Compiled)
-    let routePathAndQueryToRegexString
-        (path: string)
-        :string =
-        routePathAndQueryVariableRegex.Replace 
-            (
-                path,
-                (fun x ->
-                    let name = 
-                        if x.Value = "{_}" 
-                        then x.Index |> string
-                        else x.Groups.[1].Value
-                    sprintf "(?<%s>.+?)" name
+    let toGeneralRoutedCommand<'Command, 'Events>
+        (command: RoutedCommand<'Command, 'Events>)
+        :RoutedCommand<obj, 'Events> =
+        {
+            RoutedCommand.PathAndQuery = command.PathAndQuery
+            RoutedCommand.HttpMethod = command.HttpMethod
+            RoutedCommand.Exec = 
+                (fun (wrappedTarget: obj) (request: HttpRequest) ->
+                    command.Exec (wrappedTarget :?> 'Command) request
                 )
-            )
+        }
 
-    let createUriPathOrQueryParamParser
-        (targetType: Type)
-        :(string -> obj) =
-        if targetType = typeof<string> then
-            (fun s -> upcast s)
-        elif targetType = typeof<Int32> then
-            (fun s -> upcast (Int32.Parse s))
-        elif targetType = typeof<Boolean> then
-            (fun s -> upcast (s = "true" || s = "1"))
-        elif targetType = typeof<Double> then
-            (fun s -> upcast (Double.Parse s))
-        else
-            failwith "TODO"
-
-    let createHandler 
-        (command: RoutedCommand)
-        :CommandRequestHandler =
-        let pathAndQueryRegexString = command.PathAndQuery |> routePathAndQueryToRegexString
-        let pathAndQueryRegex = Regex(pathAndQueryRegexString, RegexOptions.Compiled)
-
-        let ctor = command.CommandType.GetConstructors().[0]      // assume a record type
-        let ctorParams = ctor.GetParameters()
-
-        let regexGroupNames = 
-            pathAndQueryRegex.GetGroupNames()
-            |> Array.filter (fun x -> x <> "0") // filter out the default group name
-
-        let ctorParamToPathAndQueryRegexMapping = 
-            regexGroupNames
-            |> Array.map
-                (fun regexGroupName ->
-                    let ctorParamIndex =
-                        ctorParams
-                        |> Array.tryFindIndex
-                            (fun ctorParam ->   // will also validate that all regex params are covered
-                                String.Equals(regexGroupName, ctorParam.Name, StringComparison.InvariantCultureIgnoreCase)
-                            )
-
-                    match ctorParamIndex with
-                    | Some ctorParamIndex ->
-                        let ctorParam = 
-                            ctorParams
-                            |> Array.item ctorParamIndex
-                            
-                        ctorParamIndex, (regexGroupName, ctorParam.ParameterType |> createUriPathOrQueryParamParser)
-                    | None ->
-                        failwith (sprintf "Unknown route parameter {%s}" regexGroupName)
-                )
-            |> Map.ofArray
-            
-        (fun (request: HttpRequest) ->
-        
-            if (request.Method |> HttpMethod.fromString) <> command.HttpMethod
-            then
-                None
-            else
-                let pathAndQueryRegexValues = 
-                    pathAndQueryRegex.Match(request.Path + request.QueryString).Groups
-                
-                let pathAndQueryParams =
-                    regexGroupNames
-                    |> Array.choose
-                        (fun regexGroupName ->
-                            let group = pathAndQueryRegexValues.Item(regexGroupName)
-                            if group.Captures.Count = 1
-                            then
-                                (regexGroupName, group.Value)
-                                |> Some
-                            else
-                                None
-                        )
-                    |> Map.ofArray
-
-                if (pathAndQueryParams |> Map.count) = (ctorParamToPathAndQueryRegexMapping |> Map.count)
-                then
-                    let ctorParamValues =
-                        ctorParams
-                        |> Array.mapi
-                            (fun index ctorParam ->
-                                let ctorParamToPathAndQueryRegexGroupName =
-                                    ctorParamToPathAndQueryRegexMapping
-                                    |> Map.tryFind index
-
-                                match ctorParamToPathAndQueryRegexGroupName with
-                                | Some (ctorParamToPathAndQueryRegexGroupName, uriPathOrQueryParamParser) ->
-                                    pathAndQueryParams
-                                    |> Map.find ctorParamToPathAndQueryRegexGroupName
-                                    |> uriPathOrQueryParamParser
-                                    |> Some
-                                | None ->
-                                    None    /// TODO
-                            )
-                        |> Array.choose id
-
-                    if (ctorParamValues |> Array.length) = (ctorParams |> Array.length)
-                    then
-                        let command =
-                            (ctorParamValues |> ctor.Invoke)
-
-                        () |> Result.Ok |> Some
-                    else
-                        None
-                else 
-                    None
-        )
-
-    let create (config: CommandWebHostConfig): IWebHost =
+    let create (config: CommandWebHostConfig<'Events>): IWebHost =
         let handlers = 
             config.Commands
-            |> List.map createHandler
+            |> List.map Routing.createHandler
             
-        let startupConfig =
+        let startupConfig:CommandWebHostStartupConfig<'Events> =
             {
-                CommandWebHostStartupConfig.Logger = config.Logger
-                CommandWebHostStartupConfig.Handlers = handlers
+                Logger = config.Logger
+                Handlers = handlers
+                OnHandle = config.OnHandle
             }
 
         WebHostBuilder()
-            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig>(startupConfig) |> ignore)
+            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig<'Events>>(startupConfig) |> ignore)
             .UseKestrel()
-            .UseStartup<CommandWebHostStartup>()
+            .UseStartup<CommandWebHostStartup<'Events>>()
             .UseUrls(config.BaseUri |> string)
             .Build()
       
