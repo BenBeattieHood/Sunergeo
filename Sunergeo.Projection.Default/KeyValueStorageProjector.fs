@@ -4,14 +4,13 @@ open Sunergeo.Core
 open Sunergeo.Logging
 open Sunergeo.KeyValueStorage
 
-type KeyValueStorageProjectionConfig<'PartitionId, 'Events, 'State when 'PartitionId : comparison> = {
+type KeyValueStorageProjectionConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
     Logger: Logger
     KeyValueStorageConfig: Sunergeo.KeyValueStorage.KeyValueStorageConfig
-    PartitionId: 'PartitionId
     CreateState: EventSourceInitItem<'PartitionId> -> 'State
     FoldState: 'State -> 'Events -> 'State
 }
-type KeyValueStoreProjector<'PartitionId, 'Events, 'State when 'PartitionId : comparison>(config: KeyValueStorageProjectionConfig<'PartitionId, 'Events, 'State>) =
+type KeyValueStoreProjector<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: KeyValueStorageProjectionConfig<'PartitionId, 'State, 'Events>, partitionId: 'PartitionId) =
     inherit Sunergeo.Projection.Projector<'PartitionId, 'Events>()
 
     let keyValueStore = new KeyValueStore<'PartitionId, 'State>(config.KeyValueStorageConfig)
@@ -44,14 +43,14 @@ type KeyValueStoreProjector<'PartitionId, 'Events, 'State when 'PartitionId : co
             
             let writeResult =
                 keyValueStore.Create
-                    config.PartitionId
+                    partitionId
                     newState
 
             writeResult |> processWriteResult
 
         | EventLogItem.Event event ->
             let state =
-                keyValueStore.Get config.PartitionId
+                keyValueStore.Get partitionId
 
             match state with
             | Ok (Some (state, version)) ->
@@ -62,7 +61,7 @@ type KeyValueStoreProjector<'PartitionId, 'Events, 'State when 'PartitionId : co
 
                 let writeResult = 
                     keyValueStore.Put
-                        config.PartitionId
+                        partitionId
                         (newState, version)
                         
                 writeResult |> processWriteResult
@@ -79,7 +78,11 @@ type KeyValueStoreProjector<'PartitionId, 'Events, 'State when 'PartitionId : co
                     error
 
                 |> config.Logger LogLevel.Error
+    
+    override this.PostStop() =
+        (keyValueStore :> System.IDisposable).Dispose()
+        base.PostStop()
 
-    interface System.IDisposable with
-        member this.Dispose() =
-            (keyValueStore :> System.IDisposable).Dispose()
+type KeyValueStoreProjectorHost<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: Sunergeo.Projection.ProjectionHostConfig<KeyValueStorageProjectionConfig<'PartitionId, 'State, 'Events>, 'PartitionId>) =
+    inherit Sunergeo.Projection.ProjectionHost<KeyValueStorageProjectionConfig<'PartitionId, 'State, 'Events>, 'PartitionId, 'State, 'Events>(config)
+    override this.CreateActor config partitionId = upcast new KeyValueStoreProjector<'PartitionId, 'State, 'Events>(config, partitionId)

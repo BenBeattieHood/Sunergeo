@@ -61,3 +61,7 @@ type ProjectionHost<'ActorConfig, 'PartitionId, 'State, 'Events when 'PartitionI
     let pollingActor = actorSystem.ActorOf(pollingActorProps)
     
     abstract member CreateActor: 'ActorConfig -> 'PartitionId -> Projector<'PartitionId, 'Events>
+    
+    interface System.IDisposable with
+        member this.Dispose() = 
+            actorSystem.Dispose()

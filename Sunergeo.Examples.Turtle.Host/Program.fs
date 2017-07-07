@@ -6,10 +6,13 @@ open Sunergeo.Core
 open Sunergeo.EventSourcing
 open Sunergeo.KeyValueStorage
 open Sunergeo.Logging
+open Sunergeo.Projection
+open Sunergeo.Projection.Default
 open Sunergeo.Web
 open Sunergeo.Web.Commands
 open Sunergeo.Web.Queries
 open Sunergeo.Examples.Turtle
+open Sunergeo.Examples.Turtle.ReadStore
 
 open ResultModule
 
@@ -134,6 +137,38 @@ let main argv =
 
     sprintf "Serving commands : %O" commandWebHostConfig.BaseUri
     |> Console.WriteLine
+
+    
+    let readStoreConfig:KeyValueStorageConfig = 
+        {
+            Uri = Uri("localhost:3000")
+            Logger = logger
+            TableName = (instanceId |> Utils.toTopic<Turtle>) + "-ReadStore"
+        }
+        
+    let kafkaProjectionHostConfig:ProjectionHostConfig<KeyValueStorageProjectionConfig<TurtleId, DefaultReadStore.Turtle, TurtleEvent>, TurtleId> = {
+        Logger = logger
+        InstanceId = instanceId
+        KafkaUri = eventSourceConfig.LogUri
+        ActorConfig = 
+            {
+                Logger = logger
+                KeyValueStorageConfig = readStoreConfig
+                CreateState = DefaultReadStore.create
+                FoldState = DefaultReadStore.fold
+            }
+        KafkaPollingActorConfig = 
+            {
+                GroupId = "tuneup"
+                AutoCommitIntervalMs = 5000 |> Some
+                StatisticsIntervalMs = 60000
+                Servers = "localhost:9092"
+            }
+        GetPartitionId = string
+    }
+
+    use kafkaProjectionHost = new KeyValueStoreProjectorHost<TurtleId, DefaultReadStore.Turtle, TurtleEvent>(kafkaProjectionHostConfig)
+        
 
     let queryWebHostConfig:QueryWebHostConfig = 
         {

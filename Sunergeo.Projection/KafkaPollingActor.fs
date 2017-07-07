@@ -51,6 +51,10 @@ type KafkaPollingActor(config: KafkaPollingActorConfig, onEvent: IActorRef -> Co
             consumer.Poll(TimeSpan.FromSeconds 5.0)
             self.Tell(message)
         )
+
+    override this.PreStart() =
+        ReceiveActor.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromMilliseconds(100.0), self, (), ActorRefs.Nobody)
+        base.PreStart()
     
     override this.PostStop() =
         consumer.Dispose()

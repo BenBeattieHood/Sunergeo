@@ -15,11 +15,10 @@ module DefaultReadStore =
     }
     
     let create
-        (context: Context)
-        (turtleId: TurtleId)
+        (init: EventSourceInitItem<TurtleId>)
         : Turtle =
         {
-            TurtleId = turtleId
+            TurtleId = init.Id
             Direction = Direction.North
             Position = [{ X = 0; Y = 0 }]
             IsVisible = true
