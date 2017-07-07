@@ -1,0 +1,22 @@
+language: node_js
+node_js: node
+cache: yarn
+before_script:
+- npm install -g webpack
+script:
+- webpack
+- rm ./build/index.html
+- karma start --single-run
+deploy:
+- provider: s3
+  bucket: pageup-ui
+  skip_cleanup: true
+  local_dir: build
+  upload-dir: sunergeo-examples-turtle-client
+  region: ap-northeast-1
+  acl: public_read
+  access_key_id: AKIAJ2VRP53TQZXJ7SVQ
+  secret_access_key:
+    secure: k7E2lTfNIAK/9N4v+CicxESeZdST0TdVNLqno5I7cFv4dEcxM6+bxoGew54TJ1d4D2KLHCSvx6hSn9bj3lD5CXvatXFnwGoYvB8/K9LoJ5tui1a35GGoeEkTFRxOOwPB5FuKek3eWot0M9PalVkK21O0IW+lN7jUbRCkr31EsyHx5p9NJVMt558DhWukQwSztkXyiw1BB2u/e1f3YxDPHZTfPmfV3fXojYmEbH4+Ro4+81gM1swSss+xoh7LdFQ8jIo6ZD6USjncptIWOa0dXgiuwxRoag7tQr3dRXKSeMdKbBWVLPzCHPXEtL7/wcRLSqPQ1bceLF7CBlakCO55mJIyvxEYxTtzAXmhLHIGVr66r3QXaFHCHQIN7T8CHz2ZniIUdJ+Au6ws3vwYjeYaZxjn8tqaFCZhnC491/zR2O//+PlzFBCPKtXmeEk5vnB0NJYlnCffAyCtv1/2rPBKz948JrL9u97K6lWhzLp9aynM86tLSZT6ot0ToaetmOF5/plyM//jbKWQGwx/qbfqZdiiNuyqDxVz2fTvyXZb/imgYDwk984ZrGXLDOhcBinjp7oYRFFZPs8e7sEMz+nGNfk689qJ9eDIQLJh2QNAmyacnQqyZwIeIAhMsxNuTMIshFLkji8fSvlrwPKwgTMCAr95LqmNAwDjD8cyuVXa4jQ=
+  on:
+    branch: master

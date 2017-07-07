@@ -1,10 +1,15 @@
 ﻿namespace Sunergeo.KeyValueStorage
 
 open System
+open Aerospike.Client
+open System.IO
+open System.Runtime.Serialization.Json
+open System.Text
 
 type KeyValueStorageConfig = {
-    uri: string // placeholder
-    logger: Sunergeo.Logging.Logger
+    Uri: Uri
+    Logger: Sunergeo.Logging.Logger
+    TableName: string
 }
 
 type AerospikeReadError =
@@ -14,57 +19,119 @@ type AerospikeReadError =
 type AerospikeWriteError =
     Timeout
     | InvalidVersion
-    | Error of string
+    | Error of String
 
 
-// This type is just a placeholder to represent the approx API offered by Aerospike. A TL;DR of write versions is here https://discuss.aerospike.com/t/locking-a-record-in-aerospike/2152/3
-type KeyValueVersion = Guid
-type Aerospike() =
+// A TL;DR of write versions is here https://discuss.aerospike.com/t/locking-a-record-in-aerospike/2152/3
+type Aerospike(config: KeyValueStorageConfig) =
+   
+    let valueColumnName = "value"
+    let db = "test"
+    
+    let client = new AerospikeClient("127.0.0.1", 3000)
 
-    let mutable innerLockSemaphore:Map<string, KeyValueVersion> = Map.empty
-    let mutable innerStore:Map<string, string> = Map.empty
+    let createKey 
+        (key: string)
+        :Key =
+        Key(db, config.TableName, key)
+
+    let createWritePolicy
+        (generation: int)
+        (generationPolicy: GenerationPolicy)
+        :WritePolicy =
+        let writePolicy = WritePolicy()
+        writePolicy.generation <- generation
+        writePolicy.generationPolicy <- GenerationPolicy.EXPECT_GEN_EQUAL
+        writePolicy
+            
 
     member this.Get
         (
             key: string
         )
-        :Async<Result<(string * KeyValueVersion) option, AerospikeReadError>> =
-        async {
-            return lock 
-                innerStore
-                (fun _ ->
-                    innerStore
-                    |> Map.tryFind key
-                    |> Option.map
-                        (fun value ->
-                            value,
-                            innerLockSemaphore |> Map.find key
-                        )
-                    |> Result.Ok
+        : Result<(string * int) option, AerospikeReadError> =
+        try  // (Database Table Row)
+
+            let keySet = key |> createKey
+            
+            client.Get(null, keySet, valueColumnName)
+            |> Option.ofObj
+            |> Option.map
+                (fun readRec ->
+                    let value = readRec.GetValue(valueColumnName) |> Option.ofObj
+                    match value with
+                    | Some value -> value :?> string, readRec.generation
+                    | None -> failwith "Boom"
                 )
-        }
+            |> Result.Ok
+
+        with
+            | :? _ as ex -> 
+                ex.Message
+                |> AerospikeReadError.Error |> Result.Error
+    
+    member this.Create
+        (
+            key: string,
+            value: string
+        )
+        :Result<unit, AerospikeWriteError> =
+        try
+            let keySet = key |> createKey
+
+            let writePolicy = createWritePolicy 0 GenerationPolicy.EXPECT_GEN_EQUAL
+
+            let binValue = new Bin(valueColumnName, value)
+            client.Put(writePolicy, keySet, binValue)
+            |> Result.Ok 
+        with
+            | :? _ as ex -> 
+                ex.Message
+                |> AerospikeWriteError.Error |> Result.Error
+
+    member this.Delete
+        (
+            key: string,
+            version: int
+        )
+        :Result<unit, AerospikeWriteError> =
+        try
+            let keySet = key |> createKey
+
+            let writePolicy = createWritePolicy version GenerationPolicy.EXPECT_GEN_EQUAL
+            
+            client.Delete(writePolicy, keySet)
+            |> ignore
+            |> Result.Ok 
+        with
+            | :? _ as ex -> 
+                ex.Message
+                |> AerospikeWriteError.Error |> Result.Error
 
     member this.Put
         (
             key: string,
             value: string,
-            version: KeyValueVersion option
+            version: int
         )
-        :Async<Result<unit, AerospikeWriteError>> =
-        async {
-            return lock
-                innerStore
-                (fun _ ->
-                    if version = (innerLockSemaphore |> Map.tryFind key)  // where None = None, or Some x = Some x
-                    then
-                        innerStore <- innerStore |> Map.add key value
-                        innerLockSemaphore <- innerLockSemaphore |> Map.add key Guid.Empty
-                        () |> Result.Ok
-                    else
-                        AerospikeWriteError.InvalidVersion |> Result.Error
-                )
-        }
+        :Result<unit, AerospikeWriteError> =
+        try
+            let keySet = key |> createKey
 
+            let writePolicy = createWritePolicy version GenerationPolicy.EXPECT_GEN_EQUAL
+
+            let binValue = new Bin(valueColumnName, value)
+            client.Put(writePolicy, keySet, binValue)
+            |> Result.Ok 
+        with
+            | :? _ as ex -> 
+                ex.Message
+                |> AerospikeWriteError.Error |> Result.Error
+                
+    interface System.IDisposable with
+        member this.Dispose() =
+            client.Close()
+            client.Dispose()
 
 type ReadError =
     Timeout
@@ -75,19 +142,27 @@ type WriteError =
     | InvalidVersion
     | Error of string
 
-type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageConfig) = 
-
-    let innerStore = Aerospike()
+module KeyValueStoreModule =
 
     let serialize
         (value: 'a)
         : string =
-        Sunergeo.Core.Todo.todo()
+        use ms = new MemoryStream() 
+        (new DataContractJsonSerializer(typeof<'a>)).WriteObject(ms, value) 
+        Encoding.Default.GetString(ms.ToArray()) 
+        
 
-    let deserialize
+    let deserialize<'a>
         (serializedValue: string)
         : 'a =
-        Sunergeo.Core.Todo.todo()
+        use ms = new MemoryStream(ASCIIEncoding.Default.GetBytes(serializedValue))
+        let obj = (new DataContractJsonSerializer(typeof<'a>)).ReadObject(ms) 
+        obj :?> 'a
+
+
+type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageConfig) = 
+
+    let innerStore = new Aerospike(config)
 
     let toReadError
         (aerospikeError: AerospikeReadError)
@@ -106,30 +181,71 @@ type KeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageC
         
     member this.Get
         (key: 'Key)
-        :Async<Result<('Value * KeyValueVersion) option, ReadError>> = 
-        async {
-            let serializedKey = key |> serialize
-            let! serializedValueAndVersion = innerStore.Get serializedKey
-
-            return 
-                serializedValueAndVersion
-                |> ResultModule.bimap
-                    (Option.map (fst >> deserialize))
-                    toReadError
-        }
+        :Result<('Value * int) option, ReadError> = 
+            let serializedKey = key |> KeyValueStoreModule.serialize
+            let serializedValueAndVersion = innerStore.Get serializedKey
+            
+            serializedValueAndVersion
+            |> ResultModule.bimap
+                (fun x ->
+                    match x with
+                    | Some (serializedValue, version) -> 
+                        let value = KeyValueStoreModule.deserialize<'Value> serializedValue
+                        (value, version)
+                        |> Some
+                    | None -> None
+                )
+                toReadError
+    
+    member this.Create
+        (key: 'Key)
+        (value: 'Value)
+        :Result<unit, WriteError> =
+            let serializedKey =
+                key
+                |> KeyValueStoreModule.serialize
+            let serializedValue =
+                value
+                |> KeyValueStoreModule.serialize
+            let result = innerStore.Create(serializedKey, serializedValue)
+            
+            result
+            |> ResultModule.mapFailure
+                toWriteError
+    
+    member this.Delete
+        (key: 'Key)
+        (generation: int)
+        :Result<unit, WriteError> =
+            let serializedKey =
+                key
+                |> KeyValueStoreModule.serialize
+            let result = innerStore.Delete(serializedKey, generation)
+            
+            result
+            |> ResultModule.mapFailure
+                toWriteError
 
     member this.Put
         (key: 'Key)
-        (version: KeyValueVersion option)
-        (value: 'Value)
-        :Async<Result<unit, WriteError>> =
-        async {
-            let serializedKey = key |> serialize
-            let serializedValue = value |> serialize
-            let! result = innerStore.Put(serializedKey, serializedValue, version)
+        (valueOverVersion: 'Value * int)
+        :Result<unit, WriteError> =
+            let serializedKey =
+                key
+                |> KeyValueStoreModule.serialize
+            let serializedValue =
+                valueOverVersion
+                |> fst
+                |> KeyValueStoreModule.serialize
+            let generation =
+                valueOverVersion
+                |> snd
+            let result = innerStore.Put(serializedKey, serializedValue, generation)
+            
+            result
+            |> ResultModule.mapFailure
+                toWriteError
 
-            return 
-                result
-                |> ResultModule.mapFailure
-                    toWriteError
-        }
+    interface System.IDisposable with
+        member this.Dispose() =
+            (innerStore :> System.IDisposable).Dispose()

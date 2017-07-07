@@ -1,0 +1,25 @@
+{
+    "compilerOptions": {
+        "jsx": "react",
+        "module": "commonjs",
+        "noImplicitAny": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "noEmitOnError": true,
+        "strictNullChecks": true,
+        "outDir": "./build/",
+        "preserveConstEnums": true,
+        "sourceMap": true,
+        "removeComments": true,
+        "target": "es5",
+        "typeRoots" : ["./@types/", "./node_modules/@types/"]
+    },
+    "include": [
+        "./src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "**/*.spec.ts",
+        "**/*.spec.tsx"
+    ]
+}

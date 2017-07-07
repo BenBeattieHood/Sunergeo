@@ -57,9 +57,8 @@
   </Target>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="RouteAttribute.fs" />
-    <Compile Include="GeneratedIdAttribute.fs" />
-    <Compile Include="Host.fs" />
+    <Compile Include="Reflection.fs" />
+    <Compile Include="CommandHost.fs" />
     <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>

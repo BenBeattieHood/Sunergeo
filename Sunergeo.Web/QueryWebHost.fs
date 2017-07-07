@@ -1,0 +1,111 @@
+﻿namespace Sunergeo.Web.Queries
+
+open System
+open Sunergeo.Core
+open Sunergeo.Web
+
+open Routing
+
+//type LogConfig = {
+//    LogName: string
+//}
+
+
+open System.Threading.Tasks
+open Microsoft.AspNetCore.Hosting
+open Microsoft.AspNetCore.Builder
+open Microsoft.AspNetCore.Http
+open Sunergeo.Logging
+open Microsoft.Extensions.DependencyInjection;
+
+type RoutedQuery<'Query> = RoutedType<'Query, obj>
+
+type QueryHandler = RoutedTypeRequestHandler<obj>
+
+type QueryWebHostStartupConfig = {
+    Logger: Sunergeo.Logging.Logger
+    ContextProvider: HttpContext -> Context
+    Handlers: QueryHandler list
+}
+
+type QueryWebHostStartup (config: QueryWebHostStartupConfig) = 
+
+    member x.Configure 
+        (
+            app: IApplicationBuilder, 
+            hosting: IHostingEnvironment
+        ): unit =
+
+        let reqHandler (ctx: HttpContext) = 
+            async {
+                sprintf "Received %O" ctx.Request.Path
+                |> config.Logger Sunergeo.Logging.LogLevel.Information
+
+                let context = ctx |> config.ContextProvider
+
+                let result =
+                    config.Handlers
+                    |> List.tryPick
+                        (fun handler ->
+                            handler context ctx.Request
+                        )
+                       
+                result
+                |> WebHost.processResultFor ctx.Response
+                    (fun result ->
+                        if result = null
+                        then
+                            null, StatusCodes.Status204NoContent
+                        else
+                            result, StatusCodes.Status200OK
+                        |> Some
+                    )
+                    (fun logLevel message -> 
+                        config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
+                    )
+
+
+            } |> Async.StartAsTask :> Task
+
+        app.Run(RequestDelegate(reqHandler))
+        
+
+type QueryWebHostConfig = {
+    Logger: Sunergeo.Logging.Logger
+    Queries: RoutedQuery<obj> list
+    BaseUri: Uri
+    ContextProvider: HttpContext -> Context
+}
+
+module QueryWebHost =
+    let toGeneralRoutedQuery<'Query>
+        (routedQuery: RoutedQuery<'Query>)
+        :RoutedQuery<obj> =
+        {
+            RoutedQuery.PathAndQuery = routedQuery.PathAndQuery
+            RoutedQuery.HttpMethod = routedQuery.HttpMethod
+            RoutedQuery.Exec = 
+                (fun (wrappedTarget: obj) (context: Context) (request: HttpRequest) ->
+                    routedQuery.Exec (wrappedTarget :?> 'Query) context request
+                )
+        }
+
+    let create (config: QueryWebHostConfig): IWebHost =
+        let handlers = 
+            config.Queries
+            |> List.map createHandler
+            
+        let startupConfig =
+            {
+                QueryWebHostStartupConfig.Logger = config.Logger
+                QueryWebHostStartupConfig.Handlers = handlers
+                QueryWebHostStartupConfig.ContextProvider = config.ContextProvider
+            }
+
+        WebHostBuilder()
+            .ConfigureServices(fun services -> services.AddSingleton<QueryWebHostStartupConfig>(startupConfig) |> ignore)
+            .UseKestrel()
+            .UseStartup<QueryWebHostStartup>()
+            .UseUrls(config.BaseUri |> string)
+            .Build()
+      

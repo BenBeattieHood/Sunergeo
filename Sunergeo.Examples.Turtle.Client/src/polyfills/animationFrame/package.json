@@ -1,0 +1,35 @@
+{
+  "name": "animation-frame",
+  "description": "An even better requestAnimationFrame",
+  "version": "0.3.0",
+  "author": {
+    "name": "Oleg Slobodskoi",
+    "email": "oleg008@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:kof/animation-frame.git"
+  },
+  "keywords": [
+    "animationFrame",
+    "RAF",
+    "requestAnimationFrame",
+    "cancelAnimationFrame"
+  ],
+  "main": "index.js",
+  "licenses": [
+    {
+      "type": "MIT",
+      "url": "http://www.opensource.org/licenses/mit-license.php"
+    }
+  ],
+  "devDependencies": {
+    "uglify-js": "^2.6.2",
+    "browserify": "^13.0.1"
+  },
+  "scripts": {
+    "build": "npm run build:browserify && npm run build:uglify",
+    "build:browserify": "browserify -e ./index.js -o ./AnimationFrame.js -s AnimationFrame",
+    "build:uglify": "uglifyjs < ./AnimationFrame.js > ./AnimationFrame.min.js --comments license"
+  }
+}

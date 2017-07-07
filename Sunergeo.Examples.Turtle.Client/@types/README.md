@@ -1,0 +1,1 @@
+Folder to allow us to add our own .d.ts files for packages not yet included (or (rare) outdated) in @types
