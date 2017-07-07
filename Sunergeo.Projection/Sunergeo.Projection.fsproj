@@ -55,8 +55,10 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="ProjectionHost.fs" />
     <Content Include="packages.config" />
+    <Compile Include="KafkaPollingActor.fs" />
+    <Compile Include="Projector.fs" />
+    <Compile Include="ProjectionHost.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Akka">

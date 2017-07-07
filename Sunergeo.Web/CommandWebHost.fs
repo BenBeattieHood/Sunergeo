@@ -73,14 +73,14 @@ type CommandWebHostConfig<'State, 'Events> = {
 
 module CommandWebHost =
     let toGeneralRoutedCommand<'Command, 'State, 'Events>
-        (command: RoutedCommand<'Command, 'State, 'Events>)
+        (routedCommand: RoutedCommand<'Command, 'State, 'Events>)
         :RoutedCommand<obj, 'State, 'Events> =
         {
-            RoutedCommand.PathAndQuery = command.PathAndQuery
-            RoutedCommand.HttpMethod = command.HttpMethod
+            RoutedCommand.PathAndQuery = routedCommand.PathAndQuery
+            RoutedCommand.HttpMethod = routedCommand.HttpMethod
             RoutedCommand.Exec = 
                 (fun (wrappedTarget: obj) (context: Context) ->
-                    command.Exec (wrappedTarget :?> 'Command) context
+                    routedCommand.Exec (wrappedTarget :?> 'Command) context
                 )
         }
 

@@ -32,6 +32,11 @@ type CommandResult<'State, 'Events> =
     | Update of 'Events seq
 
 
+type IQuery<'Id, 'ReadStore, 'Result when 'Id : comparison> =
+    abstract GetId: Context -> 'Id
+    abstract Exec: Context -> 'ReadStore -> Result<'Result, Error>
+
+
 module Utils =    
     let toTopic<'State>
         (instanceId: InstanceId)

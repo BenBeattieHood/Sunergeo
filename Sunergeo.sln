@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26430.14
+VisualStudioVersion = 15.0.26430.6
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo", "Sunergeo\Sunergeo.fsproj", "{8140AFB6-A2A9-4866-BEF5-AFD7CD841FD7}"
 EndProject
@@ -20,6 +20,8 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Projection", "Sunergeo.Projection\Sunergeo.Projection.fsproj", "{3A965557-1BF4-47BB-ACC3-C7F1125A8D6C}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Examples.Turtle.Host", "Sunergeo.Examples.Turtle.Host\Sunergeo.Examples.Turtle.Host.fsproj", "{D0E92611-5C05-4A02-B1DF-8B6A0E997110}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Projection.Default", "Sunergeo.Projection.Default\Sunergeo.Projection.Default.fsproj", "{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -63,6 +65,10 @@ Global
 		{D0E92611-5C05-4A02-B1DF-8B6A0E997110}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D0E92611-5C05-4A02-B1DF-8B6A0E997110}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D0E92611-5C05-4A02-B1DF-8B6A0E997110}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

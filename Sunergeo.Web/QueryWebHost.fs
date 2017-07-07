@@ -79,14 +79,14 @@ type QueryWebHostConfig = {
 
 module QueryWebHost =
     let toGeneralRoutedQuery<'Query>
-        (command: RoutedQuery<'Query>)
+        (routedQuery: RoutedQuery<'Query>)
         :RoutedQuery<obj> =
         {
-            RoutedQuery.PathAndQuery = command.PathAndQuery
-            RoutedQuery.HttpMethod = command.HttpMethod
+            RoutedQuery.PathAndQuery = routedQuery.PathAndQuery
+            RoutedQuery.HttpMethod = routedQuery.HttpMethod
             RoutedQuery.Exec = 
                 (fun (wrappedTarget: obj) (context: Context) (request: HttpRequest) ->
-                    command.Exec (wrappedTarget :?> 'Query) context request
+                    routedQuery.Exec (wrappedTarget :?> 'Query) context request
                 )
         }
 

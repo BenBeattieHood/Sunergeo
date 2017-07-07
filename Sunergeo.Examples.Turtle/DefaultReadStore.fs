@@ -4,6 +4,7 @@ open Sunergeo.Core
 open Sunergeo.Examples.Turtle.Core
 open Sunergeo.Examples.Turtle.Events
 
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module DefaultReadStore =
 
     type Turtle = {
@@ -50,4 +51,4 @@ module DefaultReadStore =
             }
 
 
-
+//type DefaultReadStore

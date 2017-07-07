@@ -63,6 +63,7 @@
     <Compile Include="State.fs" />
     <Compile Include="Aggregate.fs" />
     <Compile Include="Commands.fs" />
+    <Compile Include="DefaultReadStore.fs" />
     <Compile Include="Queries.fs" />
   </ItemGroup>
   <ItemGroup>
