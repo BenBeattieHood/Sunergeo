@@ -18,6 +18,7 @@ open Sunergeo.Examples.Turtle.Events
 open Sunergeo.Examples.Turtle.State
 open Sunergeo.Examples.Turtle.Aggregate
 open Sunergeo.Examples.Turtle.Commands
+open Microsoft.AspNetCore.Http
 
 [<EntryPoint>]
 let main argv = 
@@ -76,15 +77,47 @@ let main argv =
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.HttpMethod
                         RoutedCommand.Exec = 
                             (fun (command: CreateCommand) (context: Context) (request: HttpRequest) ->
-                                (command :> ICreateCommand).Exec
+                                Sunergeo.Core.Todo.todo()
+                                //(command :> ICreateCommand).Exec context
                             )
                     }
+                    
+                    //{
+                    //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.PathAndQuery
+                    //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.HttpMethod
+                    //    RoutedCommand.Exec = 
+                    //        (fun (command: TurnLeftCommand) (context: Context) ->
+                    //            Sunergeo.Core.Todo.todo()
+                    //            //(command :> ICreateCommand).Exec context
+                    //        )
+                    //}
+
+                    //{
+                    //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.PathAndQuery
+                    //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.HttpMethod
+                    //    RoutedCommand.Exec = 
+                    //        (fun (command: TurnRightCommand) (context: Context) ->
+                    //            Sunergeo.Core.Todo.todo()
+                    //            //(command :> ICreateCommand).Exec context
+                    //        )
+                    //}
+
+                    //{
+                    //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<MovedForwardsCommand>).Value.PathAndQuery
+                    //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<MovedForwardsCommand>).Value.HttpMethod
+                    //    RoutedCommand.Exec = 
+                    //        (fun (command: MovedForwardsCommand) (context: Context) ->
+                    //            Sunergeo.Core.Todo.todo()
+                    //            //(command :> ICreateCommand).Exec context
+                    //        )
+                    //}
                 ]
                 |> List.map CommandWebHost.toGeneralRoutedCommand
             OnHandle = 
                 (fun result ->
                     match result with
                     | CommandResult.Create (state, events) ->
+                        Console.WriteLine("Create OnHandle called...")
                         ()
                     | CommandResult.Update events ->
                         ()
@@ -97,6 +130,7 @@ let main argv =
     use commandWebHost = 
         commandWebHostConfig
         |> CommandWebHost.create
+    commandWebHost.Start()
 
     sprintf "Serving commands : %O" commandWebHostConfig.BaseUri
     |> Console.WriteLine
@@ -109,11 +143,22 @@ let main argv =
                 ]
                 |> List.map QueryWebHost.toGeneralRoutedQuery
             BaseUri = Uri("http://localhost:8081")
+            ContextProvider = 
+                (fun (httpContext:HttpContext) -> 
+                    Console.WriteLine("Called Context Provider...")
+                    {
+                        // TODO:
+                        Context.UserId = ""
+                        Context.WorkingAsUserId = ""
+                        Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)                        
+                    }
+                )
         }
 
     use queryWebHost =
         queryWebHostConfig
         |> QueryWebHost.create
+    queryWebHost.Start()
 
     sprintf "Serving queries : %O" queryWebHostConfig.BaseUri
     |> Console.WriteLine

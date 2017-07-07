@@ -5,12 +5,13 @@ open System.Text.RegularExpressions
 
 open Sunergeo.Core
 open Sunergeo.Web
+open Microsoft.AspNetCore.Http
 
 
 type RoutedType<'TargetType, 'Result> = {
     PathAndQuery: string
     HttpMethod: HttpMethod
-    Exec: 'TargetType -> Context -> Result<'Result, Error>
+    Exec: 'TargetType -> Context -> HttpRequest -> Result<'Result, Error>
 }
 
 type RoutedTypeRequestHandler<'Result> = 
@@ -85,7 +86,7 @@ let createHandler
             )
         |> Map.ofArray
             
-    (fun (request: Microsoft.AspNetCore.Http.HttpRequest) ->
+    (fun (context: Context) (request: Microsoft.AspNetCore.Http.HttpRequest) ->
         
         if (request.Method |> HttpMethod.fromString) <> routedType.HttpMethod
         then
@@ -136,7 +137,7 @@ let createHandler
                         |> ctor.Invoke
                         :?> 'TargetType
                         
-                    routedType.Exec target request
+                    routedType.Exec target context request
                     |> Some
                 else
                     None

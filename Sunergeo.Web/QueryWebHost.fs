@@ -74,6 +74,7 @@ type QueryWebHostConfig = {
     Logger: Sunergeo.Logging.Logger
     Queries: RoutedQuery<obj> list
     BaseUri: Uri
+    ContextProvider: HttpContext -> Context
 }
 
 module QueryWebHost =
@@ -84,8 +85,8 @@ module QueryWebHost =
             RoutedQuery.PathAndQuery = command.PathAndQuery
             RoutedQuery.HttpMethod = command.HttpMethod
             RoutedQuery.Exec = 
-                (fun (wrappedTarget: obj) (request: HttpRequest) ->
-                    command.Exec (wrappedTarget :?> 'Query) request
+                (fun (wrappedTarget: obj) (context: Context) (request: HttpRequest) ->
+                    command.Exec (wrappedTarget :?> 'Query) context request
                 )
         }
 
@@ -98,6 +99,7 @@ module QueryWebHost =
             {
                 QueryWebHostStartupConfig.Logger = config.Logger
                 QueryWebHostStartupConfig.Handlers = handlers
+                QueryWebHostStartupConfig.ContextProvider = config.ContextProvider
             }
 
         WebHostBuilder()

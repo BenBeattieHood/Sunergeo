@@ -79,8 +79,8 @@ module CommandWebHost =
             RoutedCommand.PathAndQuery = command.PathAndQuery
             RoutedCommand.HttpMethod = command.HttpMethod
             RoutedCommand.Exec = 
-                (fun (context: Context) (wrappedTarget: obj) (request: HttpRequest) ->
-                    command.Exec context (wrappedTarget :?> 'Command) request
+                (fun (wrappedTarget: obj) (context: Context) ->
+                    command.Exec (wrappedTarget :?> 'Command) context
                 )
         }
 
@@ -93,7 +93,16 @@ module CommandWebHost =
             {
                 Logger = config.Logger
                 Handlers = handlers
-                OnHandle = config.OnHandle
+                OnHandle = (fun x -> Console.WriteLine("Reached OnHandle")) // TODO
+                ContextProvider = 
+                    (fun _ -> 
+                        {
+                            // TODO:
+                            Context.UserId = ""
+                            Context.WorkingAsUserId = ""
+                            Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)
+                        }
+                    )
             }
 
         WebHostBuilder()
