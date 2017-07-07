@@ -11,7 +11,7 @@ type KafkaPollingActorConfig = {
     StatisticsIntervalMs: int
     Servers: string
 }
-type KafkaPollingActor(config: KafkaPollingActorConfig, onEvent: Confluent.Kafka.Message -> unit) as this =
+type KafkaPollingActor(config: KafkaPollingActorConfig, onEvent: IActorRef -> Confluent.Kafka.Message -> unit) as this =
     inherit ReceiveActor()
 
     let kvp 
@@ -40,14 +40,16 @@ type KafkaPollingActor(config: KafkaPollingActorConfig, onEvent: Confluent.Kafka
 
     let consumer = new Confluent.Kafka.Consumer(consumerConfiguration)
 
-    do consumer.OnMessage.Add onEvent
+    let self = this.Self
+
+    do consumer.OnMessage.Add (onEvent self)
             
     do consumer.Subscribe([ "tuneup" ]);
 
     do this.Receive<unit>
         (fun message -> 
             consumer.Poll(TimeSpan.FromSeconds 5.0)
-            this.Self.Tell(message)
+            self.Tell(message)
         )
     
     override this.PostStop() =
