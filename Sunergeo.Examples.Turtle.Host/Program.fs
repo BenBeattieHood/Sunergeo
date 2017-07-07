@@ -13,6 +13,7 @@ open Sunergeo.Web.Commands
 open Sunergeo.Web.Queries
 open Sunergeo.Examples.Turtle
 open Sunergeo.Examples.Turtle.ReadStore
+open Sunergeo.AkkaSignalr.Consumer
 
 open ResultModule
 
@@ -194,6 +195,8 @@ let main argv =
         queryWebHostConfig
         |> QueryWebHost.create
     queryWebHost.Start()
+
+    use akkaSignalr = Sunergeo.AkkaSignalr.Consumer.Program.StartAkkaAndSignalr()
 
     sprintf "Serving queries : %O" queryWebHostConfig.BaseUri
     |> Console.WriteLine

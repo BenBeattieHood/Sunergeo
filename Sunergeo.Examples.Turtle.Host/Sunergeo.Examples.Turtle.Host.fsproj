@@ -111,6 +111,9 @@
     <Reference Include="Microsoft.Extensions.Primitives">
       <HintPath>..\packages\Microsoft.Extensions.Primitives.1.1.1\lib\netstandard1.0\Microsoft.Extensions.Primitives.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Owin.Host.HttpListener">
+      <HintPath>..\packages\Microsoft.Owin.Host.HttpListener.3.1.0\lib\net45\Microsoft.Owin.Host.HttpListener.dll</HintPath>
+    </Reference>
     <Reference Include="Microsoft.Win32.Primitives">
       <HintPath>..\packages\Microsoft.Win32.Primitives.4.3.0\lib\net46\Microsoft.Win32.Primitives.dll</HintPath>
     </Reference>
@@ -212,6 +215,11 @@
     <ProjectReference Include="..\..\FSharpResult\FSharpResult\FSharpResult.fsproj">
       <Name>FSharpResult</Name>
       <Project>{d054483f-9820-45c2-b52c-dce7894583b7}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.AkkaSignalr.Consumer\TuneUpAkkaConsumer\Sunergeo.AkkaSignalr.Consumer.csproj">
+      <Name>Sunergeo.AkkaSignalr.Consumer</Name>
+      <Project>{72014ee3-9761-4333-96a2-cae649b2a8f5}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\Sunergeo.Core\Sunergeo.Core.fsproj">

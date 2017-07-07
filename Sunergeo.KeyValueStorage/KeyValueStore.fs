@@ -28,7 +28,7 @@ type Aerospike(config: KeyValueStorageConfig) =
     let valueColumnName = "value"
     let db = "test"
     
-    let client = new AerospikeClient(config.Uri.Host, config.Uri.Port)
+    let client = new AerospikeClient("127.0.0.1", 3000)
 
     let createKey 
         (key: string)
