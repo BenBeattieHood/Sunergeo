@@ -41,6 +41,6 @@ module Utils =
     let toTopic<'State>
         (instanceId: InstanceId)
         :string = 
-        sprintf "%s.%s" 
+        sprintf "%s-%s" 
             (typeof<'State>.Name)
             (instanceId |> string)
