@@ -40,7 +40,7 @@ type LogTransactionId = string
 type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogConfig) =
     let toAsync (a:'a): Async<'a> = async { return a }
 
-    let kafkaConnection = Kafka.connHost (sprintf "%s:%i" config.Uri.Host config.Uri.Port)
+    let kafkaConnection = Kafka.connHost ("localhost:9092")
     let producerMap : Map<'PartitionId, Producer> = Map.empty
 
     let consumerFunc (state:ConsumerState) (messageSet:ConsumerMessageSet): Async<unit> = 

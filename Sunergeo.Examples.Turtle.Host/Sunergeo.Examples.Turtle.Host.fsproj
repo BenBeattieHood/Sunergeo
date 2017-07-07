@@ -188,6 +188,11 @@
       <Project>{d054483f-9820-45c2-b52c-dce7894583b7}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\..\TuneUpAkkaConsumer\TuneUpAkkaConsumer\TuneUpAkkaConsumer.csproj">
+      <Name>TuneUpAkkaConsumer</Name>
+      <Project>{72014ee3-9761-4333-96a2-cae649b2a8f5}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Sunergeo.Core\Sunergeo.Core.fsproj">
       <Name>Sunergeo.Core</Name>
       <Project>{7a2ead93-127d-4066-af91-bf528097cea9}</Project>
