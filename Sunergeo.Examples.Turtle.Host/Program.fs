@@ -145,7 +145,9 @@ let main argv =
             Uri = Uri("localhost:3000")
             Logger = logger
             TableName = (instanceId |> Utils.toTopic<Turtle>) + "-ReadStore"
-        }
+        }   
+
+    use akkaSignalr = Sunergeo.AkkaSignalr.Consumer.Program.StartAkkaAndSignalr()
         
     let kafkaProjectionHostConfig:ProjectionHostConfig<KeyValueStorageProjectionConfig<TurtleId, DefaultReadStore.Turtle, TurtleEvent>, TurtleId> = {
         Logger = logger
@@ -195,8 +197,6 @@ let main argv =
         queryWebHostConfig
         |> QueryWebHost.create
     queryWebHost.Start()
-
-    use akkaSignalr = Sunergeo.AkkaSignalr.Consumer.Program.StartAkkaAndSignalr()
 
     sprintf "Serving queries : %O" queryWebHostConfig.BaseUri
     |> Console.WriteLine

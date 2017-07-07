@@ -36,7 +36,7 @@ type ProjectionHost<'ActorConfig, 'PartitionId, 'State, 'Events when 'PartitionI
                 |> Map.tryFind partitionId
                 |> Option.defaultWith
                     (fun _ ->
-                        let projectionActorProps = Akka.Actor.Props.Create(fun _ -> this.CreateActor config.ActorConfig partitionId)
+                        let projectionActorProps = Akka.Actor.Props.Create(System.Func<unit, Projector<'PartitionId, 'Events>>(fun _ -> this.CreateActor config.ActorConfig partitionId))
                         let actor = actorSystem.ActorOf(projectionActorProps)
                         actors <- actors |> Map.add partitionId actor
                         actor
@@ -57,7 +57,7 @@ type ProjectionHost<'ActorConfig, 'PartitionId, 'State, 'Events when 'PartitionI
             sprintf "Received message for unexpected topic %s (listening on %s)" message.Topic topic
             |> config.Logger LogLevel.Error
 
-    let pollingActorProps = Akka.Actor.Props.Create(fun _ -> KafkaPollingActor(config.KafkaPollingActorConfig, onKafkaMessage))
+    let pollingActorProps = Akka.Actor.Props.Create(System.Func<unit, KafkaPollingActor>(fun _ -> KafkaPollingActor(config.KafkaPollingActorConfig, onKafkaMessage)))
     let pollingActor = actorSystem.ActorOf(pollingActorProps)
     
     abstract member CreateActor: 'ActorConfig -> 'PartitionId -> Projector<'PartitionId, 'Events>
