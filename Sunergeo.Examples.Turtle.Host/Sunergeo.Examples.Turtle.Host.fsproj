@@ -191,7 +191,7 @@
       <Project>{d054483f-9820-45c2-b52c-dce7894583b7}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Sunergeo.Akka.Signalr.Consumer\TuneUpAkkaConsumer\Sunergeo.AkkaSignalr.Consumer.csproj">
+    <ProjectReference Include="..\Sunergeo.AkkaSignalr.Consumer\TuneUpAkkaConsumer\Sunergeo.AkkaSignalr.Consumer.csproj">
       <Name>Sunergeo.AkkaSignalr.Consumer</Name>
       <Project>{72014ee3-9761-4333-96a2-cae649b2a8f5}</Project>
       <Private>True</Private>
