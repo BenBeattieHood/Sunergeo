@@ -23,7 +23,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Examples.Turtle.Ho
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Projection.Default", "Sunergeo.Projection.Default\Sunergeo.Projection.Default.fsproj", "{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TuneUpAkkaConsumer", "..\TuneUpAkkaConsumer\TuneUpAkkaConsumer\TuneUpAkkaConsumer.csproj", "{72014EE3-9761-4333-96A2-CAE649B2A8F5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sunergeo.AkkaSignalr.Consumer", "Sunergeo.Akka.Signalr.Consumer\TuneUpAkkaConsumer\Sunergeo.AkkaSignalr.Consumer.csproj", "{72014EE3-9761-4333-96A2-CAE649B2A8F5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
