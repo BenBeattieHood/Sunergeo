@@ -70,31 +70,30 @@ let main argv =
 //    Exec: 'TargetType -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error>
 //}RoutedType<'Command, CommandResult<'State, 'Events>>
 
-    let commandWebHostConfig:CommandWebHostConfig<State.Turtle, TurtleEvent> = 
+    let commandWebHostConfig:CommandWebHostConfig<TurtleId, State.Turtle, TurtleEvent> = 
         {
             Logger = logger
             BaseUri = Uri("http://localhost:8080")
-            Commands = 
+            Handlers = 
                 [
                     {
                         RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.PathAndQuery
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.HttpMethod
                         RoutedCommand.Exec = 
                             (fun (command: CreateCommand) (context: Context) (request: HttpRequest) ->
-                                Sunergeo.Core.Todo.todo()
-                                //(command :> ICreateCommand).Exec context
+                                (command :> ICreateCommand<TurtleId, Turtle, TurtleEvent>).Exec context
+                                |> (Result.map (fun x -> x |> CommandResult.Create))
                             )
-                    }
+                    } |> Routing.createHandler
                     
                     //{
                     //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.PathAndQuery
                     //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.HttpMethod
                     //    RoutedCommand.Exec = 
                     //        (fun (command: TurnLeftCommand) (context: Context) ->
-                    //            Sunergeo.Core.Todo.todo()
-                    //            //(command :> ICreateCommand).Exec context
+                    //            (command :> ICommand<TurtleId, Turtle, TurtleEvent>).Exec context
                     //        )
-                    //}
+                    //} |> Routing.createHandler
 
                     //{
                     //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.PathAndQuery
@@ -104,7 +103,7 @@ let main argv =
                     //            Sunergeo.Core.Todo.todo()
                     //            //(command :> ICreateCommand).Exec context
                     //        )
-                    //}
+                    //} |> Routing.createHandler
 
                     //{
                     //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<MovedForwardsCommand>).Value.PathAndQuery
@@ -114,20 +113,13 @@ let main argv =
                     //            Sunergeo.Core.Todo.todo()
                     //            //(command :> ICreateCommand).Exec context
                     //        )
-                    //}
+                    //} |> Routing.createHandler
                 ]
-                |> List.map CommandWebHost.toGeneralRoutedCommand
             OnHandle = 
-                (fun result ->
-                    match result with
-                    | CommandResult.Create (state, events) ->
-                        Console.WriteLine("Create OnHandle called...")
-                        ()
-                    | CommandResult.Update events ->
-                        ()
-                    //events
-                    //|> eventSource.Exec
-                    ()
+                (fun id context result ->
+                    eventSource.Exec(id, context, result, Turtle.fold)
+                    |> Async.RunSynchronously
+                    |> ResultModule.get
                 )
         }
 

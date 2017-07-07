@@ -10,7 +10,7 @@ open Sunergeo.Examples.Turtle.Aggregate
 
 // Commands
 
-[<Route("/turtle/create", HttpMethod.Put)>]
+[<Route("/turtle/create/{TurtleId}", HttpMethod.Put)>]  // TODO: remove turtleid and generate for [<GeneratedId>] fields
 type CreateCommand = 
     {
         [<GeneratedId()>] 

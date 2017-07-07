@@ -132,10 +132,14 @@ let createHandler
 
                 if (ctorParamValues |> Array.length) = (ctorParams |> Array.length)
                 then
+                    let targetActivator =
+                        Sunergeo.Core.Reflection.getActivator<'TargetType>
+                            ctor
+                            ctorParams
+
                     let target =
                         ctorParamValues
-                        |> ctor.Invoke
-                        :?> 'TargetType
+                        |> targetActivator.Invoke
                         
                     routedType.Exec target context request
                     |> Some

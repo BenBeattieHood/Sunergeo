@@ -21,14 +21,14 @@ open Microsoft.AspNetCore.Http
 open Sunergeo.Logging
 open Microsoft.Extensions.DependencyInjection
 
-type CommandWebHostStartupConfig<'State, 'Events> = {
+type CommandWebHostStartupConfig<'PartitionId, 'State, 'Events> = {
     Logger: Sunergeo.Logging.Logger
     ContextProvider: HttpContext -> Context
     Handlers: CommandHandler<'State, 'Events> list
-    OnHandle: CommandResult<'State, 'Events> -> unit
+    OnHandle: 'PartitionId -> Context -> CommandResult<'State, 'Events> -> unit
 }
 
-type CommandWebHostStartup<'State, 'Events> (config: CommandWebHostStartupConfig<'State, 'Events>) = 
+type CommandWebHostStartup<'PartitionId, 'State, 'Events when 'PartitionId : comparison> (config: CommandWebHostStartupConfig<'PartitionId, 'State, 'Events>) = 
 
     member x.Configure 
         (
@@ -53,7 +53,7 @@ type CommandWebHostStartup<'State, 'Events> (config: CommandWebHostStartupConfig
                 result
                 |> WebHost.processResultFor ctx.Response
                     (fun events ->
-                        events |> config.OnHandle
+                        events |> config.OnHandle (Sunergeo.Core.Todo.todo()) context
                         None
                     )
                     (fun logLevel message -> 
@@ -64,10 +64,10 @@ type CommandWebHostStartup<'State, 'Events> (config: CommandWebHostStartupConfig
 
         app.Run(RequestDelegate(reqHandler))
 
-type CommandWebHostConfig<'State, 'Events> = {
+type CommandWebHostConfig<'PartitionId, 'State, 'Events> = {
     Logger: Sunergeo.Logging.Logger
-    Commands: RoutedCommand<obj, 'State, 'Events> list
-    OnHandle: CommandResult<'State, 'Events> -> unit
+    Handlers: CommandHandler<'State, 'Events> list
+    OnHandle: 'PartitionId -> Context -> CommandResult<'State, 'Events> -> unit
     BaseUri: Uri
 }
 
@@ -84,16 +84,13 @@ module CommandWebHost =
                 )
         }
 
-    let create<'State, 'Events> (config: CommandWebHostConfig<'State, 'Events>): IWebHost =
-        let handlers = 
-            config.Commands
-            |> List.map Routing.createHandler
+    let create<'PartitionId, 'State, 'Events when 'PartitionId : comparison> (config: CommandWebHostConfig<'PartitionId, 'State, 'Events>): IWebHost =
             
-        let startupConfig:CommandWebHostStartupConfig<'State, 'Events> =
+        let startupConfig:CommandWebHostStartupConfig<'PartitionId, 'State, 'Events> =
             {
                 Logger = config.Logger
-                Handlers = handlers
-                OnHandle = (fun x -> Console.WriteLine("Reached OnHandle")) // TODO
+                Handlers = config.Handlers
+                OnHandle = config.OnHandle
                 ContextProvider = 
                     (fun _ -> 
                         {
@@ -106,9 +103,9 @@ module CommandWebHost =
             }
 
         WebHostBuilder()
-            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig<'State, 'Events>>(startupConfig) |> ignore)
+            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig<'PartitionId, 'State, 'Events>>(startupConfig) |> ignore)
             .UseKestrel()
-            .UseStartup<CommandWebHostStartup<'State, 'Events>>()
+            .UseStartup<CommandWebHostStartup<'PartitionId, 'State, 'Events>>()
             .UseUrls(config.BaseUri |> string)
             .Build()
       
