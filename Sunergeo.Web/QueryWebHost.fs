@@ -43,15 +43,15 @@ type QueryWebHostStartup (config: QueryWebHostStartupConfig) =
 
                 let context = ctx |> config.ContextProvider
 
-                let result =
+                let queryHandler =
                     config.Handlers
                     |> List.tryPick
                         (fun handler ->
                             handler context ctx.Request
                         )
                        
-                result
-                |> WebHost.processResultFor ctx.Response
+                WebHost.runHandlerAndOutputToResponse 
+                    queryHandler
                     (fun result ->
                         if result = null
                         then
@@ -63,6 +63,7 @@ type QueryWebHostStartup (config: QueryWebHostStartupConfig) =
                     (fun logLevel message -> 
                         config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
                     )
+                    ctx.Response
 
 
             } |> Async.StartAsTask :> Task
@@ -72,34 +73,24 @@ type QueryWebHostStartup (config: QueryWebHostStartupConfig) =
 
 type QueryWebHostConfig = {
     Logger: Sunergeo.Logging.Logger
-    Queries: RoutedQuery<obj> list
+    Handlers: QueryHandler list
     BaseUri: Uri
-    ContextProvider: HttpContext -> Context
 }
 
 module QueryWebHost =
-    let toGeneralRoutedQuery<'Query>
-        (routedQuery: RoutedQuery<'Query>)
-        :RoutedQuery<obj> =
-        {
-            RoutedQuery.PathAndQuery = routedQuery.PathAndQuery
-            RoutedQuery.HttpMethod = routedQuery.HttpMethod
-            RoutedQuery.Exec = 
-                (fun (wrappedTarget: obj) (context: Context) (request: HttpRequest) ->
-                    routedQuery.Exec (wrappedTarget :?> 'Query) context request
-                )
-        }
-
     let create (config: QueryWebHostConfig): IWebHost =
-        let handlers = 
-            config.Queries
-            |> List.map createHandler
-            
         let startupConfig =
             {
                 QueryWebHostStartupConfig.Logger = config.Logger
-                QueryWebHostStartupConfig.Handlers = handlers
-                QueryWebHostStartupConfig.ContextProvider = config.ContextProvider
+                QueryWebHostStartupConfig.Handlers = config.Handlers
+                QueryWebHostStartupConfig.ContextProvider = 
+                    (fun httpContext -> 
+                        {
+                            Context.UserId = Sunergeo.Core.Todo.todo()
+                            Context.WorkingAsUserId = ""
+                            Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)
+                        }
+                    )
             }
 
         WebHostBuilder()

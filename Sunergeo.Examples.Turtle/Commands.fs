@@ -30,7 +30,7 @@ type TurnLeftCommand =
     {
         TurtleId: TurtleId
     }
-    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
+    interface IUpdateCommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context _ =
             seq {
@@ -45,7 +45,7 @@ type TurnRightCommand =
     {
         TurtleId: TurtleId
     }
-    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
+    interface IUpdateCommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context _ =
             seq {
@@ -60,7 +60,7 @@ type GoForwardsCommand =
     {
         TurtleId: TurtleId
     }
-    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
+    interface IUpdateCommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context state =
 
@@ -93,7 +93,7 @@ type SetVisibilityCommand =
         TurtleId: TurtleId
         IsVisible: bool
     }
-    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
+    interface IUpdateCommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context _ =
             seq {

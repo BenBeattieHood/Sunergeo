@@ -10,9 +10,13 @@ open Routing
 //    LogName: string
 //}
 
-type RoutedCommand<'Command, 'State, 'Events> = RoutedType<'Command, CommandResult<'State, 'Events>>
+type RoutedCommand<'Command, 'PartitionId when 'Command :> ICommandBase<'PartitionId> and 'PartitionId : comparison> =
+    RoutedType<'Command, unit>
 
-type CommandHandler<'State, 'Events> = RoutedTypeRequestHandler<CommandResult<'State, 'Events>>
+//type RoutedCommand<'Command, 'PartitionId, 'State, 'Events when 'Command :> IUpdateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison> =
+//    RoutedType<'Command, UpdateCommandResult<'Events>>
+
+type CommandHandler = RoutedTypeRequestHandler<unit>
 
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Hosting
@@ -21,11 +25,11 @@ open Microsoft.AspNetCore.Http
 open Sunergeo.Logging
 open Microsoft.Extensions.DependencyInjection
 
-type CommandWebHostStartupConfig<'PartitionId, 'State, 'Events> = {
+//, 'CreateCommand, 'UpdateCommand and 'CreateCommand :> ICreateCommand<'PartitionId, 'Events> and 'UpdateCommand :> IUpdateCommand<'PartitionId, 'State, 'Events>
+type CommandWebHostStartupConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
     Logger: Sunergeo.Logging.Logger
     ContextProvider: HttpContext -> Context
-    Handlers: CommandHandler<'State, 'Events> list
-    OnHandle: 'PartitionId -> Context -> CommandResult<'State, 'Events> -> unit
+    Handlers: CommandHandler list
 }
 
 type CommandWebHostStartup<'PartitionId, 'State, 'Events when 'PartitionId : comparison> (config: CommandWebHostStartupConfig<'PartitionId, 'State, 'Events>) = 
@@ -43,22 +47,20 @@ type CommandWebHostStartup<'PartitionId, 'State, 'Events when 'PartitionId : com
 
                 let context = ctx |> config.ContextProvider
 
-                let result =
+                let commandHandler =
                     config.Handlers
                     |> List.tryPick
                         (fun handler ->
                             handler context ctx.Request
                         )
                         
-                result
-                |> WebHost.processResultFor ctx.Response
-                    (fun events ->
-                        events |> config.OnHandle (Sunergeo.Core.Todo.todo()) context
-                        None
-                    )
+                WebHost.runHandlerAndOutputToResponse 
+                    commandHandler
+                    (fun _ -> None)
                     (fun logLevel message -> 
                         config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
                     )
+                    ctx.Response
 
             } |> Async.StartAsTask :> Task
 
@@ -66,20 +68,19 @@ type CommandWebHostStartup<'PartitionId, 'State, 'Events when 'PartitionId : com
 
 type CommandWebHostConfig<'PartitionId, 'State, 'Events> = {
     Logger: Sunergeo.Logging.Logger
-    Handlers: CommandHandler<'State, 'Events> list
-    OnHandle: 'PartitionId -> Context -> CommandResult<'State, 'Events> -> unit
+    Handlers: CommandHandler list
     BaseUri: Uri
 }
 
 module CommandWebHost =
-    let toGeneralRoutedCommand<'Command, 'State, 'Events>
-        (routedCommand: RoutedCommand<'Command, 'State, 'Events>)
-        :RoutedCommand<obj, 'State, 'Events> =
+    let toGeneralRoutedCommand<'Command, 'PartitionId when 'Command :> ICommandBase<'PartitionId> and 'PartitionId : comparison>
+        (routedCommand: RoutedCommand<'Command, 'PartitionId>)
+        :RoutedCommand<ICommandBase<'PartitionId>, 'PartitionId> =
         {
             RoutedCommand.PathAndQuery = routedCommand.PathAndQuery
             RoutedCommand.HttpMethod = routedCommand.HttpMethod
             RoutedCommand.Exec = 
-                (fun (wrappedTarget: obj) (context: Context) ->
+                (fun (wrappedTarget: ICommandBase<'PartitionId>) (context: Context) ->
                     routedCommand.Exec (wrappedTarget :?> 'Command) context
                 )
         }
@@ -90,12 +91,10 @@ module CommandWebHost =
             {
                 Logger = config.Logger
                 Handlers = config.Handlers
-                OnHandle = config.OnHandle
                 ContextProvider = 
-                    (fun _ -> 
+                    (fun httpContext -> 
                         {
-                            // TODO:
-                            Context.UserId = ""
+                            Context.UserId = Sunergeo.Core.Todo.todo()
                             Context.WorkingAsUserId = ""
                             Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)
                         }

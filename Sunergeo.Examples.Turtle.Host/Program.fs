@@ -32,9 +32,9 @@ let execCreateCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :
     : Async<Result<unit, Error>> =
     eventSource.Create context (command.GetId context) command.Exec
 
-let execCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> ICommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison>
+let execCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> IUpdateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison>
     (eventSource: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
-    (command: ICommand<'PartitionId, 'State, 'Events>)
+    (command: IUpdateCommand<'PartitionId, 'State, 'Events>)
     (context: Context)
     (request: HttpRequest)
     : Async<Result<unit, Error>> =
@@ -84,12 +84,6 @@ let main argv =
     sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
     |> Console.WriteLine
     
-//type RoutedType<'TargetType, 'Result> = {
-//    PathAndQuery: string
-//    HttpMethod: HttpMethod
-//    Exec: 'TargetType -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error>
-//}RoutedType<'Command, CommandResult<'State, 'Events>>
-
     let commandWebHostConfig:CommandWebHostConfig<TurtleId, State.Turtle, TurtleEvent> = 
         {
             Logger = logger
@@ -101,20 +95,24 @@ let main argv =
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.HttpMethod
                         RoutedCommand.Exec = 
                             (fun command context request ->
-                                (command :> ICreateCommand<TurtleId, Turtle, TurtleEvent>).Exec context
-                                |> ResultModule.map (fun x -> x |> CommandResult.Create)
+                                eventSource.Create
+                                    context
+                                    ((command :> ICreateCommand<TurtleId, Turtle, TurtleEvent>).GetId())
+                                    ((command :> ICreateCommand<TurtleId, Turtle, TurtleEvent>).Exec context)
                             )
-                    } |> Routing.createHandler
+                    } |> CommandWebHost.toGeneralRoutedCommand |> Routing.createHandler
                     
                     {
                         RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.PathAndQuery
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.HttpMethod
                         RoutedCommand.Exec = 
                             (fun command context request ->
-                                (command :> ICommand<TurtleId, Turtle, TurtleEvent>).Exec context
-                                |> ResultModule.map (fun x -> x |> CommandResult.Update)
+                                eventSource.Append
+                                    context
+                                    ((command :> IUpdateCommand<TurtleId, Turtle, TurtleEvent>).GetId())
+                                    ((command :> IUpdateCommand<TurtleId, Turtle, TurtleEvent>).Exec context)
                             )
-                    } |> Routing.createHandler
+                    } |> CommandWebHost.toGeneralRoutedCommand |> Routing.createHandler
 
                     //{
                     //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.PathAndQuery
@@ -136,12 +134,6 @@ let main argv =
                     //        )
                     //} |> Routing.createHandler
                 ]
-            OnHandle = 
-                (fun id context result ->
-                    eventSource.Exec(id, context, result, Turtle.fold)
-                    |> Async.RunSynchronously
-                    |> ResultModule.get
-                )
         }
 
     use commandWebHost = 

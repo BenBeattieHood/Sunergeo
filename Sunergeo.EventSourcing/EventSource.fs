@@ -148,7 +148,7 @@ type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(c
                     |> ResultModule.map apply
             )
 
-    member this.Append(context: Context) (partitionId: 'PartitionId) (f: CommandExec<'State, 'Events>): Async<Result<unit, Error>> =
+    member this.Append(context: Context) (partitionId: 'PartitionId) (f: UpdateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
         let apply
             (snapshot: Snapshot<'State>)
             (newEvents: 'Events seq)

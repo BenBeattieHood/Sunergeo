@@ -15,7 +15,7 @@ type RoutedType<'TargetType, 'Result> = {
 }
 
 type RoutedTypeRequestHandler<'Result> = 
-    Context -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error> option
+    Context -> Microsoft.AspNetCore.Http.HttpRequest -> Option<unit -> Result<'Result, Error>>
 
 
 let routePathAndQueryVariableRegex = Regex(@"\{(.+?)\}", RegexOptions.Compiled)
@@ -141,7 +141,7 @@ let createHandler
                         ctorParamValues
                         |> targetActivator.Invoke
                         
-                    routedType.Exec target context request
+                    (fun _ -> routedType.Exec target context request)
                     |> Some
                 else
                     None
