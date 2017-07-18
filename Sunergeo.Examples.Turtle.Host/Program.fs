@@ -99,13 +99,21 @@ let main argv =
                     {
                         RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.PathAndQuery
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.HttpMethod
-                        RoutedCommand.Exec = execCreateCommand
+                        RoutedCommand.Exec = 
+                            (fun command context request ->
+                                (command :> ICreateCommand<TurtleId, Turtle, TurtleEvent>).Exec context
+                                |> ResultModule.map (fun x -> x |> CommandResult.Create)
+                            )
                     } |> Routing.createHandler
                     
                     {
                         RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.PathAndQuery
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.HttpMethod
-                        RoutedCommand.Exec = execCommand
+                        RoutedCommand.Exec = 
+                            (fun command context request ->
+                                (command :> ICommand<TurtleId, Turtle, TurtleEvent>).Exec context
+                                |> ResultModule.map (fun x -> x |> CommandResult.Update)
+                            )
                     } |> Routing.createHandler
 
                     //{

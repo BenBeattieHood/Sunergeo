@@ -31,7 +31,7 @@ type ICommand<'Id, 'State, 'Events when 'Id : comparison> =
     
     
 type CommandResult<'State, 'Events> =
-    Create of ('State) * ('Events seq)
+    Create of 'Events seq
     | Update of 'Events seq
 
 
