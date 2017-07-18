@@ -51,6 +51,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="LogTopic.fs" />
     <Compile Include="EventSource.fs" />
     <Content Include="packages.config" />
   </ItemGroup>

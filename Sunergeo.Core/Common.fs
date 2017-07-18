@@ -10,8 +10,8 @@ type Context = {
 }
 
 type ErrorStatus =
-      PermissionDenied
-    | InvalidOp
+      InvalidOp
+    | PermissionDenied
     | Unknown
 
 type Error = {
@@ -19,14 +19,14 @@ type Error = {
     Message: string
 }
 with
-    static member PermissionDenied message = 
-        {
-            Error.Status = ErrorStatus.PermissionDenied
-            Message = message
-        }
     static member InvalidOp message = 
         {
             Error.Status = ErrorStatus.InvalidOp
+            Message = message
+        }
+    static member PermissionDenied message = 
+        {
+            Error.Status = ErrorStatus.PermissionDenied
             Message = message
         }
 

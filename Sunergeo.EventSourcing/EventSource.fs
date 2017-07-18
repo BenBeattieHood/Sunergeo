@@ -1,12 +1,9 @@
 ﻿namespace Sunergeo.EventSourcing
 
 open System
-open System.Text
 open Sunergeo.Core
 open Sunergeo.KeyValueStorage
-open System.Diagnostics
-open Kafunk
-open Newtonsoft.Json
+open Sunergeo.EventSourcing.Storage
 
 type Snapshot<'State> = {
     Position: int64
@@ -15,145 +12,23 @@ type Snapshot<'State> = {
 
 type EventSourceConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
     InstanceId: InstanceId
+    Create: Context -> 'PartitionId -> 'State
     Fold: 'State -> 'Events -> 'State
     SnapshotStore: Sunergeo.KeyValueStorage.KeyValueStore<'PartitionId, Snapshot<'State>>
     LogUri: Uri
     Logger: Sunergeo.Logging.Logger
 }
 
-type LogEntry<'Item> = {
-    Position: int   // in Kafka this is called the offset, and it is available after the item has been written to a partition
-    Item: 'Item
-}
-
-type LogConfig = {
-    Uri: Uri
-    Topic: string
-}
-
-type LogError =
-    Timeout
-    | Error of string
-
-type LogTransactionId = string
-
-type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogConfig) =
-    let toAsync (a:'a): Async<'a> = async { return a }
-
-    let kafkaConnection = Kafka.connHost ("localhost:9092")
-    let producerMap : Map<'PartitionId, Producer> = Map.empty
-
-    let consumerFunc (state:ConsumerState) (messageSet:ConsumerMessageSet): Async<unit> = 
-        async {
-                printfn "\nMESSAGE: member_id=%s topic=%s partition=%i" state.memberId messageSet.topic messageSet.partition
-                printfn "%s" (System.Text.Encoding.ASCII.GetString messageSet.messageSet.messages.[0].message.value.Array)
-        }
-
-
-    let createProducer (partitionId: 'PartitionId) =
-        let producerCfg =
-              ProducerConfig.create (
-                topic = config.Topic, 
-                partition = Partitioner.konst (hash partitionId), 
-                requiredAcks = RequiredAcks.Local)
-
-        let producer =
-            Producer.createAsync kafkaConnection producerCfg
-            |> Async.RunSynchronously
-
-        producer
-
-    let addProducerToMap (partitionId: 'PartitionId) =
-        let producer = createProducer partitionId
-        producerMap.Add(partitionId, producer) |> ignore
-        producer
-
-    // https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/
-    member this.BeginTransaction(): Async<LogTransactionId> =
-        async {
-            return ("" : LogTransactionId)
-        }
-
-    member this.AbortTransaction(): Async<unit> =
-        async {
-            return Sunergeo.Core.NotImplemented.NotImplemented()
-        }
-
-    member this.CommitTransaction(): Async<unit> =
-        async {
-            return Sunergeo.Core.NotImplemented.NotImplemented()
-        }
-
-    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int64, LogError>> =
-        async {
-            let producer = 
-                producerMap
-                |> Map.tryFind partitionId
-                |> Option.defaultWith
-                    (fun _ ->
-                        addProducerToMap partitionId 
-                    )           
-
-            let jsonSerializer = JsonConvert.SerializeObject >> Encoding.ASCII.GetBytes
-            let serializedItem = jsonSerializer item
-            let producerMessage = ProducerMessage.ofBytes(serializedItem)
-
-            let! result = Producer.produce producer producerMessage
-            return (int64)result.offset |> Result.Ok
-        }
-
-    member this.ReadFrom(partitionId: 'PartitionId, positionId: int64): Async<Result<LogEntry<'Item> seq, LogError>> =
-        async {         
-            let topic = "turtle"
-            let consumerGroup = "turtle-group"
-
-            let consumerConfig = 
-                ConsumerConfig.create (
-                  groupId = consumerGroup, 
-                  topic = topic, 
-                  autoOffsetReset = AutoOffsetReset.StartFromTime Time.EarliestOffset,
-                  fetchMaxBytes = 1000000,
-                  fetchMinBytes = 1,
-                  fetchMaxWaitMs = 1000,
-                  fetchBufferSize = 1,
-                  sessionTimeout = 30000,
-                  heartbeatFrequency = 3,
-                  checkCrc = true,
-                  endOfTopicPollPolicy = RetryPolicy.constantMs 1000
-                )
-
-            let consumer =
-              Consumer.create kafkaConnection consumerConfig
-
-            // commit on every message set
-            let mutable mutableSet:ConsumerMessageSet = new ConsumerMessageSet()
-
-            let r = Consumer.consume consumer consumerFunc // |> Async.RunSynchronously
-
-            //Consumer.consume consumer 
-            //  (fun (state:ConsumerState) (messageSet:ConsumerMessageSet) -> async {
-            //    printfn "member_id=%s topic=%s partition=%i" state.memberId messageSet.topic messageSet.partition
-            //    //do! Consumer.commitOffsets consumer (ConsumerMessageSet.commitPartitionOffsets messageSet) 
-            //    mutableSet <- messageSet
-            //    })
-            //|> Async.RunSynchronously
-            
-            let error = LogError.Error "Bah bow"
-            let errorResult = Result.Error error
-
-            return errorResult
-        }
- 
-    interface System.IDisposable with
-        member this.Dispose() =
-            kafkaConnection.Close()
-        
-        
-
 type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: EventSourceConfig<'PartitionId, 'State, 'Events>) = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
+
+    let asd
+        (asyncResult: Result<Async<Result<'Ok, 'Error1>>, 'Error2>)
+        (mapError1ToError2: 'Error1 -> 'Error2)
+        :unit =
+        ()
 
     let logConfig:LogConfig = {
         Topic = topic
@@ -162,97 +37,141 @@ type EventSource<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(c
 
     let kafkaTopic = new LogTopic<'PartitionId, EventLogItem<'PartitionId, 'Events>>(logConfig)
     
-    let rec exec
+    let append
         (partitionId: 'PartitionId)
-        (context: Context) 
-        (fold: 'State -> 'Events -> 'State)
-        (commandResult: CommandResult<'State, 'Events>)
+        (getNewStateAndEvents: (Snapshot<'State> * int) option -> Result<'State * (EventLogItem<'PartitionId, 'Events> seq) * (int option), Error>)
         :Async<Result<unit, Error>> =
         
         async {
-            //let partitionId = command.GetId context
-            let snapshotAndVersionResult = config.SnapshotStore.Get partitionId
+            let snapshotAndVersion = 
+                partitionId 
+                |> config.SnapshotStore.Get 
 
-            let snapshotAndVersion =
-                snapshotAndVersionResult
+            let (newState, events, version) = 
+                snapshotAndVersion 
+                |> ResultModule.get 
+                |> getNewStateAndEvents
                 |> ResultModule.get
-                
-            let newState, newEvents, version =
-                match commandResult, snapshotAndVersion with
-                | CommandResult.Create (newState, newEvents), None ->
-                    let newEvents = seq {
-                        yield 
-                            {
-                                EventSourceInitItem.Id = partitionId
-                                EventSourceInitItem.CreatedOn = context.Timestamp
-                            }
-                            |> EventLogItem.Init
-
-                        yield!
-                            newEvents |> Seq.map EventLogItem.Event
-                    }
-
-                    newState, newEvents, None
-                | CommandResult.Update newEvents, Some (snapshot, version) ->
-                    let newState = 
-                        newEvents
-                        |> Seq.fold fold snapshot.State
-
-                    newState, (newEvents |> Seq.map EventLogItem.Event), (version |> Some)
-
-                | _ -> 
-                    failwith "uhoh"
-                //| CommandResult.Create _, Some state ->
-                //    let asd = ("" |> Error.InvalidOp |> Result.Error)
-                    
-                    
+            
             let! transactionId = kafkaTopic.BeginTransaction()
             
             try
-                let mutable position:int64 option = None
-
-                for event in newEvents do
-                    let! positionResult = kafkaTopic.Add(partitionId, event) 
-                    position <- (positionResult |> ResultModule.get |> Some)
+                let mutable position = 0 |> int64
+                
+                for event in events do
+                    let! positionResult = kafkaTopic.Add(partitionId, event)
+                    position <- (positionResult |> ResultModule.get)    
                     
-                match position with
-                | Some position ->
-                    let snapshot = {
-                        Snapshot.Position = position
-                        Snapshot.State = newState
-                    }
+                let snapshot = {
+                    Snapshot.Position = position
+                    Snapshot.State = newState
+                }
 
-                    let snapshotPutResult =
-                        match version with
-                        | None ->
-                            config.SnapshotStore.Create
-                                partitionId
-                                snapshot
+                let snapshotPutResult =
+                    match version with
+                    | None ->
+                        config.SnapshotStore.Create
+                            partitionId
+                            snapshot
 
-                        | Some version ->
-                            config.SnapshotStore.Put
-                                partitionId
-                                (snapshot, version)
+                    | Some version ->
+                        config.SnapshotStore.Put
+                            partitionId
+                            (snapshot, version)
 
-                    do snapshotPutResult |> ResultModule.get
-
-                    do! kafkaTopic.CommitTransaction()
-
-                | None ->
-                    do! kafkaTopic.AbortTransaction()
+                do snapshotPutResult |> ResultModule.get
+                
+                do! kafkaTopic.CommitTransaction()
 
                 return () |> Result.Ok
             with
+                //| :? ResultModule.ResultException<Sunergeo.EventSourcing.Storage.LogError> as resultException ->
+                //    do! kafkaTopic.AbortTransaction()
+                //    return 
+                //        match resultException.Error with
+                //        | Timeout ->
+                //            Error. Result.Error
+
+                | :? ResultModule.ResultException<Sunergeo.KeyValueStorage.WriteError> as resultException ->
+                    do! kafkaTopic.AbortTransaction()
+
+                    return 
+                        match resultException.Error with
+                        | Sunergeo.KeyValueStorage.WriteError.Timeout -> 
+                            Sunergeo.Core.Todo.todo()
+
+                        | Sunergeo.KeyValueStorage.WriteError.InvalidVersion -> 
+                            Sunergeo.Core.Todo.todo()
+
+                        | Sunergeo.KeyValueStorage.WriteError.Error error -> 
+                            error 
+                            |> Sunergeo.Core.Error.InvalidOp 
+                            |> Result.Error
+
                 | :? _ as ex ->
                     do! kafkaTopic.AbortTransaction()
                     return Sunergeo.Core.NotImplemented.NotImplemented() //This needs transaction support
 
-                  
         }
+    
+    member this.Create(context: Context) (partitionId: 'PartitionId) (f: CreateCommandExec<'Events>): Async<Result<unit, Error>> =
+        let apply
+            (newEvents: 'Events seq)
+            =
+            let newState = config.Create context partitionId
 
-    member this.Exec(partitionId: 'PartitionId, context: Context, commandResult: CommandResult<'State, 'Events>, fold: 'State -> 'Events-> 'State):Async<Result<unit, Error>> =
-        commandResult
-        |> exec partitionId context fold
+            let newEvents = seq {
+                yield 
+                    {
+                        EventSourceInitItem.Id = partitionId
+                        EventSourceInitItem.CreatedOn = context.Timestamp
+                    }
+                    |> EventLogItem.Init
+
+                yield!
+                    newEvents 
+                    |> Seq.map EventLogItem.Event
+            }
+
+            newState, newEvents, None
+
+        append partitionId
+            (fun snapshotAndVersion ->
+                match snapshotAndVersion with
+                | Some snapshotAndVersion ->
+                    (sprintf "Expected empty state, found %O" snapshotAndVersion)
+                    |> Error.InvalidOp
+                    |> Result.Error
+
+                | None -> 
+                    f context 
+                    |> ResultModule.map apply
+            )
+
+    member this.Append(context: Context) (partitionId: 'PartitionId) (f: CommandExec<'State, 'Events>): Async<Result<unit, Error>> =
+        let apply
+            (snapshot: Snapshot<'State>)
+            (newEvents: 'Events seq)
+            (version: int)
+            =
+            let newState = 
+                newEvents
+                |> Seq.fold config.Fold snapshot.State
+
+            newState, (newEvents |> Seq.map EventLogItem.Event), (version |> Some)
+
+        append partitionId
+            (fun snapshotAndVersion ->
+                match snapshotAndVersion with
+                | None -> 
+                    "State, found None"
+                    |> Error.InvalidOp
+                    |> Result.Error
+                    
+                | Some (snapshot, version) ->
+                    f context snapshot.State 
+                    |> ResultModule.map (fun newEvents -> apply snapshot newEvents version)
+            )
         
     interface System.IDisposable with
         member this.Dispose() =

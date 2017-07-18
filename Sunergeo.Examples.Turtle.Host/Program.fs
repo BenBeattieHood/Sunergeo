@@ -24,6 +24,22 @@ open Sunergeo.Examples.Turtle.Aggregate
 open Sunergeo.Examples.Turtle.Commands
 open Microsoft.AspNetCore.Http
 
+let execCreateCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> ICreateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison>
+    (eventSource: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
+    (command: 'Command)
+    (context: Context)
+    (request: HttpRequest)
+    : Async<Result<unit, Error>> =
+    eventSource.Create context (command.GetId context) command.Exec
+
+let execCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> ICommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison>
+    (eventSource: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
+    (command: ICommand<'PartitionId, 'State, 'Events>)
+    (context: Context)
+    (request: HttpRequest)
+    : Async<Result<unit, Error>> =
+    eventSource.Append context (command.GetId context) command.Exec
+
 [<EntryPoint>]
 let main argv = 
     //let assemblies = [typeof<Turtle>.Assembly]
@@ -53,6 +69,7 @@ let main argv =
     let eventSourceConfig:EventSourceConfig<TurtleId, Turtle, TurtleEvent> = 
         {
             InstanceId = instanceId
+            Create = Turtle.create
             Fold = Turtle.fold
             SnapshotStore = snapshotStore
             LogUri = Uri("localhost:9092")
@@ -60,6 +77,9 @@ let main argv =
         }
     
     use eventSource = new Sunergeo.EventSourcing.EventSource<TurtleId, Turtle, TurtleEvent>(eventSourceConfig)
+
+    let execCreateCommand = execCreateCommandFor eventSource
+    let execCommand = execCommandFor eventSource
 
     sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
     |> Console.WriteLine
@@ -79,21 +99,14 @@ let main argv =
                     {
                         RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.PathAndQuery
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.HttpMethod
-                        RoutedCommand.Exec = 
-                            (fun (command: CreateCommand) (context: Context) (request: HttpRequest) ->
-                                (command :> ICreateCommand<TurtleId, Turtle, TurtleEvent>).Exec context
-                                |> (Result.map (fun x -> x |> CommandResult.Create))
-                            )
+                        RoutedCommand.Exec = execCreateCommand
                     } |> Routing.createHandler
                     
-                    //{
-                    //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.PathAndQuery
-                    //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.HttpMethod
-                    //    RoutedCommand.Exec = 
-                    //        (fun (command: TurnLeftCommand) (context: Context) ->
-                    //            (command :> ICommand<TurtleId, Turtle, TurtleEvent>).Exec context
-                    //        )
-                    //} |> Routing.createHandler
+                    {
+                        RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.PathAndQuery
+                        RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.HttpMethod
+                        RoutedCommand.Exec = execCommand
+                    } |> Routing.createHandler
 
                     //{
                     //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.PathAndQuery

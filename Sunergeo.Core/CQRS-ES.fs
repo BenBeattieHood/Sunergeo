@@ -15,16 +15,19 @@ type EventLogItem<'Id, 'Events when 'Id : comparison> =
     | Event of 'Events
 
 
+
 type ICommandBase<'Id when 'Id : comparison> =
     abstract GetId: Context -> 'Id
     
-type ICreateCommand<'Id, 'State, 'Event when 'Id : comparison> =
+type CreateCommandExec<'Events> = Context -> Result<'Events seq, Error>
+type ICreateCommand<'Id, 'State, 'Events when 'Id : comparison> =
     inherit ICommandBase<'Id>
-    abstract Exec: Context -> Result<'State * ('Event seq), Error>
+    abstract Exec: CreateCommandExec<'Events>
 
-type ICommand<'Id, 'State, 'Event when 'Id : comparison> =
+type CommandExec<'State, 'Events> = Context -> 'State -> Result<'Events seq, Error>
+type ICommand<'Id, 'State, 'Events when 'Id : comparison> =
     inherit ICommandBase<'Id>
-    abstract Exec: Context -> 'State -> Result<'Event seq, Error>
+    abstract Exec: CommandExec<'State, 'Events>
     
     
 type CommandResult<'State, 'Events> =
