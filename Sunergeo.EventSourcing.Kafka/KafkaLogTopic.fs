@@ -1,4 +1,6 @@
-﻿namespace Sunergeo.EventSourcing.Storage
+﻿namespace Sunergeo.EventSourcing.Kafka
+
+open Sunergeo.EventSourcing.Storage
 
 open System
 open System.Text
@@ -11,9 +13,10 @@ type LogEntry<'Item> = {
     Item: 'Item
 }
 
-type LogConfig = {
+type LogConfig<'PartitionId, 'State when 'PartitionId : comparison> = {
     Uri: Uri
     Topic: string
+    Logger: Sunergeo.Logging.Logger
 }
 
 type LogError =
@@ -22,7 +25,7 @@ type LogError =
 
 type LogTransactionId = string
 
-type LogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogConfig) =
+type ILogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogConfig) =
     let toAsync (a:'a): Async<'a> = async { return a }
 
     let kafkaConnection = Kafka.connHost (sprintf "%s:%i" config.Uri.Host config.Uri.Port)
