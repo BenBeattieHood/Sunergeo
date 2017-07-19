@@ -16,13 +16,10 @@ type CreateCommand =
         [<GeneratedId()>] 
         TurtleId: TurtleId
     }
-    interface ICreateCommand<TurtleId, Turtle, TurtleEvent> with 
+    interface ICreateCommand<TurtleId, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context =
-            (
-                this.TurtleId |> Turtle.create context,
-                Seq.empty
-            )
+            Seq.empty
             |> Result.Ok
 
 [<Route("/turtle/{TurtleId}/turn-left", HttpMethod.Post)>]

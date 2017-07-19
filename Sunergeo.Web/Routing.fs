@@ -8,10 +8,10 @@ open Sunergeo.Web
 open Microsoft.AspNetCore.Http
 
 
-type RoutedType<'TargetType, 'Result> = {
+type RoutedType<'HandlerType, 'Result> = {
     PathAndQuery: string
     HttpMethod: HttpMethod
-    Exec: 'TargetType -> Context -> HttpRequest -> Result<'Result, Error>
+    Exec: 'HandlerType -> Context -> HttpRequest -> Result<'Result, Error>
 }
 
 type RoutedTypeRequestHandler<'Result> = 

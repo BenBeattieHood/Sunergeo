@@ -23,13 +23,13 @@ type CreateCommandResult<'Events> = Result<'Events seq, Error>
 type CreateCommandExec<'Events> = Context -> CreateCommandResult<'Events>
 type ICreateCommand<'Id, 'Events when 'Id : comparison> =
     inherit ICommandBase<'Id>
-    abstract Exec: CreateCommandExec<'Events>
+    abstract Exec: Context -> CreateCommandResult<'Events>
     
 type UpdateCommandResult<'Events> = Result<'Events seq, Error>
 type UpdateCommandExec<'State, 'Events> = Context -> 'State -> UpdateCommandResult<'Events>
 type IUpdateCommand<'Id, 'State, 'Events when 'Id : comparison> =
     inherit ICommandBase<'Id>
-    abstract Exec: UpdateCommandExec<'State, 'Events>
+    abstract Exec: Context -> 'State -> UpdateCommandResult<'Events>
     
 
 

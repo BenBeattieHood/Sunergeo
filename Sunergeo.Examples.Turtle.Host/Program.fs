@@ -24,21 +24,29 @@ open Sunergeo.Examples.Turtle.Aggregate
 open Sunergeo.Examples.Turtle.Commands
 open Microsoft.AspNetCore.Http
 
-let execCreateCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> ICreateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison>
+let execCreateCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> ICreateCommand<'PartitionId, 'Events> and 'PartitionId : comparison>
     (eventSource: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
     (command: 'Command)
     (context: Context)
     (request: HttpRequest)
-    : Async<Result<unit, Error>> =
-    eventSource.Create context (command.GetId context) command.Exec
+    : Result<unit, Error> =
+    eventSource.Create
+        context
+        (command.GetId context)
+        command.Exec
+    |> Async.RunSynchronously
 
 let execCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> IUpdateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison>
     (eventSource: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
     (command: IUpdateCommand<'PartitionId, 'State, 'Events>)
     (context: Context)
     (request: HttpRequest)
-    : Async<Result<unit, Error>> =
-    eventSource.Append context (command.GetId context) command.Exec
+    : Result<unit, Error> =
+    eventSource.Append
+        context
+        (command.GetId context)
+        command.Exec
+    |> Async.RunSynchronously
 
 [<EntryPoint>]
 let main argv = 
@@ -93,46 +101,26 @@ let main argv =
                     {
                         RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.PathAndQuery
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.HttpMethod
-                        RoutedCommand.Exec = 
-                            (fun command context request ->
-                                eventSource.Create
-                                    context
-                                    ((command :> ICreateCommand<TurtleId, Turtle, TurtleEvent>).GetId())
-                                    ((command :> ICreateCommand<TurtleId, Turtle, TurtleEvent>).Exec context)
-                            )
-                    } |> CommandWebHost.toGeneralRoutedCommand |> Routing.createHandler
+                        RoutedCommand.Exec = execCreateCommand
+                    } |> Routing.createHandler
                     
                     {
                         RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.PathAndQuery
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.HttpMethod
-                        RoutedCommand.Exec = 
-                            (fun command context request ->
-                                eventSource.Append
-                                    context
-                                    ((command :> IUpdateCommand<TurtleId, Turtle, TurtleEvent>).GetId())
-                                    ((command :> IUpdateCommand<TurtleId, Turtle, TurtleEvent>).Exec context)
-                            )
-                    } |> CommandWebHost.toGeneralRoutedCommand |> Routing.createHandler
+                        RoutedCommand.Exec = execCommand
+                    } |> Routing.createHandler
 
-                    //{
-                    //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.PathAndQuery
-                    //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.HttpMethod
-                    //    RoutedCommand.Exec = 
-                    //        (fun (command: TurnRightCommand) (context: Context) ->
-                    //            Sunergeo.Core.Todo.todo()
-                    //            //(command :> ICreateCommand).Exec context
-                    //        )
-                    //} |> Routing.createHandler
+                    {
+                        RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.PathAndQuery
+                        RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.HttpMethod
+                        RoutedCommand.Exec = execCommand
+                    } |> Routing.createHandler
 
-                    //{
-                    //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<MovedForwardsCommand>).Value.PathAndQuery
-                    //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<MovedForwardsCommand>).Value.HttpMethod
-                    //    RoutedCommand.Exec = 
-                    //        (fun (command: MovedForwardsCommand) (context: Context) ->
-                    //            Sunergeo.Core.Todo.todo()
-                    //            //(command :> ICreateCommand).Exec context
-                    //        )
-                    //} |> Routing.createHandler
+                    {
+                        RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<GoForwardsCommand>).Value.PathAndQuery
+                        RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<GoForwardsCommand>).Value.HttpMethod
+                        RoutedCommand.Exec = execCommand
+                    } |> Routing.createHandler
                 ]
         }
 
@@ -181,21 +169,10 @@ let main argv =
     let queryWebHostConfig:QueryWebHostConfig = 
         {
             Logger = logger
-            Queries = 
+            Handlers = 
                 [
                 ]
-                |> List.map QueryWebHost.toGeneralRoutedQuery
             BaseUri = Uri("http://localhost:8081")
-            ContextProvider = 
-                (fun (httpContext:HttpContext) -> 
-                    Console.WriteLine("Called Context Provider...")
-                    {
-                        // TODO:
-                        Context.UserId = ""
-                        Context.WorkingAsUserId = ""
-                        Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)                        
-                    }
-                )
         }
 
     use queryWebHost =
