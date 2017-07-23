@@ -1,4 +1,4 @@
-﻿namespace Sunergeo.EventSourcing.Kafka
+﻿namespace Sunergeo.EvenSourcing.Kafka
 
 open Sunergeo.EventSourcing.Storage
 
