@@ -54,6 +54,7 @@
     <Compile Include="IEventStoreImplementation.fs" />
     <Compile Include="EventStore.fs" />
     <Content Include="packages.config" />
+    <Compile Include="MemoryEventStoreImplementation.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Control.AsyncSeq">
