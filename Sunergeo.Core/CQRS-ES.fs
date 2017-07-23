@@ -19,11 +19,11 @@ type EventLogItem<'Id, 'Events when 'Id : comparison> =
 type ICommandBase<'Id when 'Id : comparison> =
     abstract GetId: Context -> 'Id
     
-type CreateCommandResult<'Events> = Result<'Events seq, Error>
-type CreateCommandExec<'Events> = Context -> CreateCommandResult<'Events>
-type ICreateCommand<'Id, 'Events when 'Id : comparison> =
+type CreateCommandResult<'State, 'Events> = Result<'State * 'Events seq, Error>
+type CreateCommandExec<'State, 'Events> = Context -> CreateCommandResult<'State, 'Events>
+type ICreateCommand<'Id, 'State, 'Events when 'Id : comparison> =
     inherit ICommandBase<'Id>
-    abstract Exec: Context -> CreateCommandResult<'Events>
+    abstract Exec: Context -> CreateCommandResult<'State, 'Events>
     
 type UpdateCommandResult<'Events> = Result<'Events seq, Error>
 type UpdateCommandExec<'State, 'Events> = Context -> 'State -> UpdateCommandResult<'Events>

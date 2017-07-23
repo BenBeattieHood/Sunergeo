@@ -6,7 +6,6 @@ open Sunergeo.EventSourcing.Storage
 
 
 type EventStoreConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
-    Create: Context -> 'PartitionId -> 'State
     Fold: 'State -> 'Events -> 'State
     Logger: Sunergeo.Logging.Logger
     Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events>
@@ -14,12 +13,13 @@ type EventStoreConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparis
 
 type EventStore<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: EventStoreConfig<'PartitionId, 'State, 'Events>) = 
     
-    member this.Create(context: Context) (partitionId: 'PartitionId) (f: CreateCommandExec<'Events>): Async<Result<unit, Error>> =
+    member this.Create(context: Context) (partitionId: 'PartitionId) (f: CreateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
         let apply
-            (newEvents: 'Events seq)
+            (
+                (newState: 'State),
+                (newEvents: 'Events seq)
+            )
             =
-            let newState = config.Create context partitionId
-
             let newEvents = seq {
                 yield 
                     {
