@@ -20,8 +20,6 @@ type LogError =
     Timeout
     | Error of string
 
-type LogTransactionId = string
-
 type EventStoreProcess<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = 
     (Snapshot<'State> * int) option -> Result<'State * (EventLogItem<'PartitionId, 'Events> seq) * (int option), Error>
 

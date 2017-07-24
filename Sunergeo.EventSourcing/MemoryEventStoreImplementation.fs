@@ -7,52 +7,75 @@ open Sunergeo.Core
 open Sunergeo.KeyValueStorage
 open Sunergeo.EventSourcing.Storage
 
-type MemoryLogConfig = {
-    Uri: string // placeholder
-    Topic: string
-}
+type MemoryLogTransactionId = Guid
 
-type MemoryLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: MemoryLogConfig) =
+type MemoryLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>() =
     
     let mutable eventSource:Map<'PartitionId, LogEntry<'Item> seq> = Map.empty
+    let mutable transactions:Map<MemoryLogTransactionId, ('PartitionId * 'Item) seq> = Map.empty
 
-    member this.BeginTransaction(): Async<LogTransactionId> =
-        async {
-            return ("" : LogTransactionId)
-        }
+    member this.BeginTransaction(): MemoryLogTransactionId =
+        Guid.NewGuid().ToByteArray() |> MemoryLogTransactionId
 
-    member this.AbortTransaction(): Async<unit> =
-        async {
-            return Sunergeo.Core.Todo.todo()
-        }
+    member this.AbortTransaction(transactionId: MemoryLogTransactionId): unit =
+        lock transactions
+            (fun _ ->
+                transactions <- 
+                    transactions 
+                    |> Map.remove
+                        transactionId
+            )
 
-    member this.CommitTransaction(): Async<unit> =
-        async {
-            return Sunergeo.Core.Todo.todo()
-        }
+    member this.CommitTransaction(transactionId: MemoryLogTransactionId): unit =
+        lock transactions
+            (fun _ ->
+                let partitionItems =
+                    transactions
+                    |> Map.tryFind transactionId
+                    |> Option.defaultValue Seq.empty
+                    |> Seq.groupBy
+                        (fun (partitionId, _) -> partitionId)
+                    |> Seq.map
+                        (fun (a, items) -> a, items |> Seq.map snd) /// there should be a Seq.groupBy alternative for this
 
-    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int, LogError>> =
-        async {
-            let partition =
-                eventSource
-                |> Map.tryFind partitionId
-                |> Option.defaultValue Seq.empty
+                lock eventSource
+                    (fun _ ->
+                        for (partitionId, items) in partitionItems do
 
-            let partitionLength = 
-                partition
-                |> Seq.length
+                            let partition =
+                                eventSource
+                                |> Map.tryFind partitionId
+                                |> Option.defaultValue Seq.empty
+                
+                            let partitionLength = 
+                                partition
+                                |> Seq.length
             
-            eventSource <- 
-                eventSource 
-                |> Map.add 
-                    partitionId 
-                    (
-                        partition 
-                        |> Seq.append [ { Position = partitionLength; Item = item } ]
+                            for index, item in items |> Seq.indexed do
+                                eventSource <- 
+                                    eventSource 
+                                    |> Map.add 
+                                        partitionId 
+                                        (
+                                            partition 
+                                            |> Seq.append [ { Position = partitionLength + index; Item = item } ]
+                                        )
                     )
+            )
 
-            return partitionLength |> Result.Ok
-        }
+    member this.Add(transactionId: MemoryLogTransactionId, partitionId: 'PartitionId, item: 'Item): unit =
+        lock transactions
+            (fun _ ->
+                let newPartitionsAndItems =
+                    transactions
+                    |> Map.tryFind transactionId
+                    |> Option.defaultValue Seq.empty
+                    |> Seq.append [ (partitionId, item) ]
+
+                transactions <-
+                    transactions
+                    |> Map.add transactionId newPartitionsAndItems
+            )
 
 type MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
     InstanceId: InstanceId
@@ -66,13 +89,8 @@ type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events when 'Partitio
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
-        
-    let logConfig:MemoryLogConfig = {
-        Topic = topic
-        Uri = config.LogUri
-    }
 
-    let memoryTopic = new MemoryLogTopic<'PartitionId, EventLogItem<'PartitionId, 'Events>>(logConfig)
+    let memoryTopic = new MemoryLogTopic<'PartitionId, EventLogItem<'PartitionId, 'Events>>()
     
     let append
         (partitionId: 'PartitionId)
@@ -90,15 +108,14 @@ type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events when 'Partitio
                 |> getNewStateAndEvents
                 |> ResultModule.get
             
-            let! transactionId = memoryTopic.BeginTransaction()
+            let transactionId = memoryTopic.BeginTransaction()
             
             try
-                let mutable position = 0 |> int64
-                
                 for event in events do
-                    let! positionResult = memoryTopic.Add(partitionId, event)
-                    position <- (positionResult |> ResultModule.get)    
+                    memoryTopic.Add(transactionId, partitionId, event)
                     
+                let position = events |> Seq.length |> int64
+
                 let snapshot = {
                     Snapshot.Position = position
                     Snapshot.State = newState
@@ -118,7 +135,7 @@ type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events when 'Partitio
 
                 do snapshotPutResult |> ResultModule.get
                 
-                do! memoryTopic.CommitTransaction()
+                do! memoryTopic.CommitTransaction(transactionId)
 
                 return () |> Result.Ok
             with
