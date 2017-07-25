@@ -38,7 +38,7 @@ module KeyValueStoreModule =
         obj :?> 'a
 
 
-type IKeyValueStore<'Key, 'Value, 'Version when 'Key : comparison and 'Version : comparison> = 
+type IKeyValueStore<'Key, 'Value, 'Version when 'Version : comparison> = 
 
     abstract member Get: 'Key -> Result<('Value * 'Version) option, ReadError>
     

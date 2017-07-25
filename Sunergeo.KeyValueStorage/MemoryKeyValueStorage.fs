@@ -1,106 +1,109 @@
 ﻿namespace Sunergeo.KeyValueStorage.Memory
 
+open System
 open Sunergeo
 open Sunergeo.Core
 open Sunergeo.KeyValueStorage
 
 type KeyValueVersion = Guid
-type MemoryKeyValueStore<'Key, 'Value when 'Key : comparison>() =
+type MemoryKeyValueStore<'Key, 'Value>() =
 
-    let mutable innerLockSemaphore:Map<'Key, KeyValueVersion> = Map.empty
-    let mutable innerStore:Map<'Key, string> = Map.empty
+    let mutable innerLockSemaphore:Map<string, KeyValueVersion> = Map.empty
+    let mutable innerStore:Map<string, string> = Map.empty
     
     interface IKeyValueStore<'Key, 'Value, KeyValueVersion> with
         member this.Get
             (key: 'Key)
             :Result<('Value * KeyValueVersion) option, ReadError> = 
-            let asd = 
-                lock 
-                    innerStore
-                    (fun _ ->
-                        innerStore
-                        |> Map.tryFind key
-                        |> Option.map
-                            (fun value ->
-                                value,
-                                innerLockSemaphore |> Map.find key
-                            )
-                        |> Result.Ok
-                    )
-                //let serializedKey = key |> KeyValueStoreModule.serialize
-                //let serializedValueAndVersion = innerStore.Get serializedKey
             
-                //serializedValueAndVersion
-                //|> ResultModule.bimap
-                //    (fun x ->
-                //        match x with
-                //        | Some (serializedValue, version) -> 
-                //            let value = KeyValueStoreModule.deserialize<'Value> serializedValue
-                //            (value, version)
-                //            |> Some
-                //        | None -> None
-                //    )
-                //    toReadError
-            ()
+            let serializedKey = key |> KeyValueStoreModule.serialize
+            
+            lock 
+                innerStore
+                (fun _ ->
+                    innerStore
+                    |> Map.tryFind serializedKey
+                    |> Option.map
+                        (fun value ->
+                            value |> KeyValueStoreModule.deserialize<'Value>,
+                            innerLockSemaphore |> Map.find serializedKey
+                        )
+                    |> Result.Ok
+                )
     
         member this.Create
             (key: 'Key)
             (value: 'Value)
             :Result<unit, WriteError> =
-                //let serializedKey =
-                //    key
-                //    |> KeyValueStoreModule.serialize
-                //let serializedValue =
-                //    value
-                //    |> KeyValueStoreModule.serialize
-                //let result = innerStore.Create(serializedKey, serializedValue)
-            
-                //result
-                //|> ResultModule.mapFailure
-                //    toWriteError
-            ()
+
+            let serializedKey =
+                key
+                |> KeyValueStoreModule.serialize
+
+            let serializedValue =
+                value
+                |> KeyValueStoreModule.serialize
+                
+            lock
+                innerStore
+                (fun _ ->
+                    if None = (innerLockSemaphore |> Map.tryFind serializedKey)  // where None = None, or Some x = Some x
+                    then
+                        innerStore <- innerStore |> Map.add serializedKey serializedValue
+                        let newVersion = Guid.NewGuid().ToByteArray() |> KeyValueVersion
+                        innerLockSemaphore <- innerLockSemaphore |> Map.add serializedKey newVersion
+                        () |> Result.Ok
+                    else
+                        WriteError.InvalidVersion |> Result.Error
+                )
     
         member this.Delete
             (key: 'Key)
             (version: KeyValueVersion)
             :Result<unit, WriteError> =
-                //let serializedKey =
-                //    key
-                //    |> KeyValueStoreModule.serialize
-                //let result = innerStore.Delete(serializedKey, generation)
-            
-                //result
-                //|> ResultModule.mapFailure
-                //    toWriteError
-            ()
+            let serializedKey =
+                key
+                |> KeyValueStoreModule.serialize
+                
+            lock
+                innerStore
+                (fun _ ->
+                    if version = (innerLockSemaphore |> Map.find serializedKey)  // where None = None, or Some x = Some x
+                    then
+                        innerStore <- innerStore |> Map.remove serializedKey
+                        innerLockSemaphore <- innerLockSemaphore |> Map.remove serializedKey
+                        () |> Result.Ok
+                    else
+                        WriteError.InvalidVersion |> Result.Error
+                )
 
         member this.Put
             (key: 'Key)
             (valueOverVersion: 'Value * KeyValueVersion)
             :Result<unit, WriteError> =
+
+            let serializedKey =
+                key
+                |> KeyValueStoreModule.serialize
+
+            let serializedValue =
+                valueOverVersion
+                |> fst
+                |> KeyValueStoreModule.serialize
+
+            let version = 
+                valueOverVersion
+                |> snd
+
             lock
                 innerStore
                 (fun _ ->
-                    if version = (innerLockSemaphore |> Map.tryFind key)  // where None = None, or Some x = Some x
+                    if version = (innerLockSemaphore |> Map.find serializedKey)  // where None = None, or Some x = Some x
                     then
-                        innerStore <- innerStore |> Map.add key value
-                        innerLockSemaphore <- innerLockSemaphore |> Map.add key Guid.Empty
+                        innerStore <- innerStore |> Map.add serializedKey serializedValue
+                        let newVersion = Guid.NewGuid().ToByteArray() |> KeyValueVersion
+                        innerLockSemaphore <- innerLockSemaphore |> Map.add serializedKey newVersion
                         () |> Result.Ok
                     else
-                        AerospikeWriteError.InvalidVersion |> Result.Error
+                        WriteError.InvalidVersion |> Result.Error
                 )
-                //let serializedKey =
-                //    key
-                //    |> KeyValueStoreModule.serialize
-                //let serializedValue =
-                //    valueOverVersion
-                //    |> fst
-                //    |> KeyValueStoreModule.serialize
-                //let generation =
-                //    valueOverVersion
-                //    |> snd
-                //let result = innerStore.Put(serializedKey, serializedValue, generation)
-            
-                //result
-                //|> ResultModule.mapFailure
-                //    toWriteError
