@@ -5,16 +5,16 @@ open Sunergeo
 open Sunergeo.Core
 open Sunergeo.KeyValueStorage
 
-type KeyValueVersion = Guid
+type MemoryKeyValueVersion = Guid
 type MemoryKeyValueStore<'Key, 'Value>() =
 
-    let mutable innerLockSemaphore:Map<string, KeyValueVersion> = Map.empty
+    let mutable innerLockSemaphore:Map<string, MemoryKeyValueVersion> = Map.empty
     let mutable innerStore:Map<string, string> = Map.empty
     
-    interface IKeyValueStore<'Key, 'Value, KeyValueVersion> with
+    interface IKeyValueStore<'Key, 'Value, MemoryKeyValueVersion> with
         member this.Get
             (key: 'Key)
-            :Result<('Value * KeyValueVersion) option, ReadError> = 
+            :Result<('Value * MemoryKeyValueVersion) option, ReadError> = 
             
             let serializedKey = key |> KeyValueStoreModule.serialize
             
@@ -50,7 +50,7 @@ type MemoryKeyValueStore<'Key, 'Value>() =
                     if None = (innerLockSemaphore |> Map.tryFind serializedKey)  // where None = None, or Some x = Some x
                     then
                         innerStore <- innerStore |> Map.add serializedKey serializedValue
-                        let newVersion = Guid.NewGuid().ToByteArray() |> KeyValueVersion
+                        let newVersion = Guid.NewGuid().ToByteArray() |> MemoryKeyValueVersion
                         innerLockSemaphore <- innerLockSemaphore |> Map.add serializedKey newVersion
                         () |> Result.Ok
                     else
@@ -59,7 +59,7 @@ type MemoryKeyValueStore<'Key, 'Value>() =
     
         member this.Delete
             (key: 'Key)
-            (version: KeyValueVersion)
+            (version: MemoryKeyValueVersion)
             :Result<unit, WriteError> =
             let serializedKey =
                 key
@@ -79,7 +79,7 @@ type MemoryKeyValueStore<'Key, 'Value>() =
 
         member this.Put
             (key: 'Key)
-            (valueOverVersion: 'Value * KeyValueVersion)
+            (valueOverVersion: 'Value * MemoryKeyValueVersion)
             :Result<unit, WriteError> =
 
             let serializedKey =
@@ -101,7 +101,7 @@ type MemoryKeyValueStore<'Key, 'Value>() =
                     if version = (innerLockSemaphore |> Map.find serializedKey)  // where None = None, or Some x = Some x
                     then
                         innerStore <- innerStore |> Map.add serializedKey serializedValue
-                        let newVersion = Guid.NewGuid().ToByteArray() |> KeyValueVersion
+                        let newVersion = Guid.NewGuid().ToByteArray() |> MemoryKeyValueVersion
                         innerLockSemaphore <- innerLockSemaphore |> Map.add serializedKey newVersion
                         () |> Result.Ok
                     else

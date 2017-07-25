@@ -3,15 +3,16 @@
 type IEvent = interface end
 
 
-type EventSourceInitItem<'Id when 'Id : comparison> = 
+type EventSourceInitItem<'Id, 'Init when 'Id : comparison> = 
     {
         Id: 'Id
         CreatedOn: NodaTime.Instant
+        Init: 'Init
     }
     interface IEvent
     
-type EventLogItem<'Id, 'Events when 'Id : comparison> = 
-    Init of EventSourceInitItem<'Id>
+type EventLogItem<'Id, 'Init, 'Events when 'Id : comparison> = 
+    Init of EventSourceInitItem<'Id, 'Init>
     | Event of 'Events
 
 

@@ -77,15 +77,15 @@ type MemoryLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>() =
                     |> Map.add transactionId newPartitionsAndItems
             )
 
-type MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
+type MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
     InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events>
-    SnapshotStore: Sunergeo.KeyValueStorage.KeyValueStore<'PartitionId, Snapshot<'State>>
+    Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion>
+    SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'PartitionId, Snapshot<'State>, 'KeyValueVersion>
     LogUri: Uri
 }
 
-type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'Events>) = 
+type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion>) = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
@@ -94,7 +94,7 @@ type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events when 'Partitio
     
     let append
         (partitionId: 'PartitionId)
-        (getNewStateAndEvents: (Snapshot<'State> * int) option -> Result<'State * (EventLogItem<'PartitionId, 'Events> seq) * (int option), Error>)
+        (getNewStateAndEvents: (Snapshot<'State> * 'KeyValueVersion) option -> Result<'State * (EventLogItem<'PartitionId, 'Events> seq) * ('KeyValueVersion option), Error>)
         :Async<Result<unit, Error>> =
         
         async {
@@ -162,7 +162,7 @@ type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events when 'Partitio
                             |> Sunergeo.Core.Error.InvalidOp 
                             |> Result.Error
 
-                | :? _ as ex ->
+                | _ as ex ->
                     do memoryTopic.AbortTransaction(transactionId)
                     return Sunergeo.Core.NotImplemented.NotImplemented() //This needs transaction support
 

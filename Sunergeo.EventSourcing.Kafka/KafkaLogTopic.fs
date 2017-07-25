@@ -1,4 +1,4 @@
-﻿namespace Sunergeo.EvenSourcing.Kafka
+﻿namespace Sunergeo.EventSourcing.Kafka
 
 open Sunergeo.EventSourcing.Storage
 
@@ -7,8 +7,6 @@ open System.Text
 open Sunergeo.Core
 open Kafunk
 open Newtonsoft.Json
-
-type LogTransactionId = string
 
 type LogEntry<'Item> = {
     Position: int   // in Kafka this is called the offset, and it is available after the item has been written to a partition

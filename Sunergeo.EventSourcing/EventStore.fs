@@ -5,13 +5,13 @@ open Sunergeo.Core
 open Sunergeo.EventSourcing.Storage
 
 
-type EventStoreConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
+type EventStoreConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
     Fold: 'State -> 'Events -> 'State
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events>
+    Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion>
 }
 
-type EventStore<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: EventStoreConfig<'PartitionId, 'State, 'Events>) = 
+type EventStore<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion>) = 
     
     member this.Create(context: Context) (partitionId: 'PartitionId) (f: CreateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
         let apply

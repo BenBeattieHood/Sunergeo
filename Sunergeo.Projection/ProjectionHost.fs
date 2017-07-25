@@ -15,9 +15,8 @@ type ProjectionHostConfig<'ActorConfig, 'PartitionId> = {
     GetPartitionId: int -> 'PartitionId
 }
 
-//type ProjectionHost<'PartitionId, 'Events, 'State when 'PartitionId : comparison>(config: ProjectionHostConfig) = 
 [<AbstractClass>]
-type ProjectionHost<'ActorConfig, 'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: ProjectionHostConfig<'ActorConfig, 'PartitionId>) as this = 
+type ProjectionHost<'ActorConfig, 'PartitionId, 'Init, 'State, 'Events when 'PartitionId : comparison>(config: ProjectionHostConfig<'ActorConfig, 'PartitionId>) as this = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
@@ -36,7 +35,7 @@ type ProjectionHost<'ActorConfig, 'PartitionId, 'State, 'Events when 'PartitionI
                 |> Map.tryFind partitionId
                 |> Option.defaultWith
                     (fun _ ->
-                        let projectionActorProps = Akka.Actor.Props.Create(System.Func<unit, Projector<'PartitionId, 'Events>>(fun _ -> this.CreateActor config.ActorConfig partitionId))
+                        let projectionActorProps = Akka.Actor.Props.Create(System.Func<unit, Projector<'PartitionId, 'Init, 'Events>>(fun _ -> this.CreateActor config.ActorConfig partitionId))
                         let actor = actorSystem.ActorOf(projectionActorProps)
                         actors <- actors |> Map.add partitionId actor
                         actor
@@ -51,7 +50,7 @@ type ProjectionHost<'ActorConfig, 'PartitionId, 'State, 'Events when 'PartitionI
         then
             let partitionId = message.Partition |> config.GetPartitionId
             let actor = partitionId |> createOrLoadActor
-            let events:EventLogItem<'PartitionId, 'Events> = Sunergeo.Core.Todo.todo()
+            let events:EventLogItem<'PartitionId, 'Init, 'Events> = Sunergeo.Core.Todo.todo()
             actor.Tell(events, pollingActorRef)
         else
             sprintf "Received message for unexpected topic %s (listening on %s)" message.Topic topic
@@ -60,7 +59,7 @@ type ProjectionHost<'ActorConfig, 'PartitionId, 'State, 'Events when 'PartitionI
     let pollingActorProps = Akka.Actor.Props.Create(System.Func<unit, KafkaPollingActor>(fun _ -> KafkaPollingActor(config.KafkaPollingActorConfig, onKafkaMessage)))
     let pollingActor = actorSystem.ActorOf(pollingActorProps)
     
-    abstract member CreateActor: 'ActorConfig -> 'PartitionId -> Projector<'PartitionId, 'Events>
+    abstract member CreateActor: 'ActorConfig -> 'PartitionId -> Projector<'PartitionId, 'Init, 'Events>
     
     interface System.IDisposable with
         member this.Dispose() = 

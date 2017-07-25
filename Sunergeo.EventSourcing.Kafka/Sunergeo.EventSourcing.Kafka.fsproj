@@ -86,6 +86,16 @@
       <Project>{7a2ead93-127d-4066-af91-bf528097cea9}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.EventSourcing\Sunergeo.EventSourcing.fsproj">
+      <Name>Sunergeo.EventSourcing</Name>
+      <Project>{bca1c940-bd2e-4822-951e-16941f87de95}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.KeyValueStorage\Sunergeo.KeyValueStorage.fsproj">
+      <Name>Sunergeo.KeyValueStorage</Name>
+      <Project>{1f5a780b-974c-4e53-b513-06c73770db0f}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>

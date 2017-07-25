@@ -1,22 +1,20 @@
 ﻿namespace Sunergeo.EventSourcing.Kafka
 
-open Sunergeo.EventSourcing.Storage
-
 open System
 open Sunergeo.Core
 open Sunergeo.KeyValueStorage
 open Sunergeo.EventSourcing.Storage
 
 
-type KafkaEventStoreImplementationConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
+type KafkaEventStoreImplementationConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
     InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events>
-    SnapshotStore: Sunergeo.KeyValueStorage.KeyValueStore<'PartitionId, Snapshot<'State>>
+    Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion>
+    SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'PartitionId, Snapshot<'State>, 'KeyValueVersion>
     LogUri: Uri
 }
 
-type KafkaEventStoreImplementation<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: KafkaEventStoreImplementationConfig<'PartitionId, 'State, 'Events>) = 
+type KafkaEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion>) = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
@@ -30,7 +28,7 @@ type KafkaEventStoreImplementation<'PartitionId, 'State, 'Events when 'Partition
     
     let append
         (partitionId: 'PartitionId)
-        (getNewStateAndEvents: (Snapshot<'State> * int) option -> Result<'State * (EventLogItem<'PartitionId, 'Events> seq) * (int option), Error>)
+        (getNewStateAndEvents: (Snapshot<'State> * 'KeyValueVersion) option -> Result<'State * (EventLogItem<'PartitionId, 'Events> seq) * ('KeyValueVersion option), Error>)
         :Async<Result<unit, Error>> =
         
         async {

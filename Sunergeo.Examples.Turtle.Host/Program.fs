@@ -5,6 +5,7 @@ open System
 open Sunergeo.Core
 open Sunergeo.EventSourcing
 open Sunergeo.KeyValueStorage
+open Sunergeo.KeyValueStorage.Memory
 open Sunergeo.Logging
 open Sunergeo.Projection
 open Sunergeo.Projection.Default
@@ -69,7 +70,7 @@ let main argv =
             TableName = instanceId |> Utils.toTopic<Turtle>
         }
 
-    use snapshotStore = new KeyValueStore<TurtleId, Snapshot<Turtle>>(snapshotStoreConfig)
+    use snapshotStore = new MemoryKeyValueStore<TurtleId, Snapshot<Turtle>>(snapshotStoreConfig)
 
     sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
     |> Console.WriteLine
@@ -84,7 +85,7 @@ let main argv =
             Logger = logger
         }
     
-    use eventSource = new Sunergeo.EventSourcing.EventSource<TurtleId, Turtle, TurtleEvent>(eventSourceConfig)
+    use eventSource = new Sunergeo.EventSourcing.EventSource<TurtleId, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventSourceConfig)
 
     let execCreateCommand = execCreateCommandFor eventSource
     let execCommand = execCommandFor eventSource
