@@ -135,7 +135,7 @@ type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events when 'Partitio
 
                 do snapshotPutResult |> ResultModule.get
                 
-                do! memoryTopic.CommitTransaction(transactionId)
+                do memoryTopic.CommitTransaction(transactionId)
 
                 return () |> Result.Ok
             with
@@ -147,7 +147,7 @@ type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events when 'Partitio
                 //            Error. Result.Error
 
                 | :? ResultModule.ResultException<Sunergeo.KeyValueStorage.WriteError> as resultException ->
-                    do! memoryTopic.AbortTransaction()
+                    do memoryTopic.AbortTransaction(transactionId)
 
                     return 
                         match resultException.Error with
@@ -163,7 +163,7 @@ type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events when 'Partitio
                             |> Result.Error
 
                 | :? _ as ex ->
-                    do! memoryTopic.AbortTransaction()
+                    do memoryTopic.AbortTransaction(transactionId)
                     return Sunergeo.Core.NotImplemented.NotImplemented() //This needs transaction support
 
         }

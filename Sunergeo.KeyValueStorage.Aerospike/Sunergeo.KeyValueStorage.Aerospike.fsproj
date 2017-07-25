@@ -5,14 +5,14 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <SchemaVersion>2.0</SchemaVersion>
-    <ProjectGuid>1f5a780b-974c-4e53-b513-06c73770db0f</ProjectGuid>
+    <ProjectGuid>8358d8a6-165b-403b-87d3-dc94baa55c0c</ProjectGuid>
     <OutputType>Library</OutputType>
-    <RootNamespace>Sunergeo.KeyValueStorage</RootNamespace>
-    <AssemblyName>Sunergeo.KeyValueStorage</AssemblyName>
+    <RootNamespace>Sunergeo.KeyValueStorage.Aerospike</RootNamespace>
+    <AssemblyName>Sunergeo.KeyValueStorage.Aerospike</AssemblyName>
     <TargetFrameworkVersion>v4.6.2</TargetFrameworkVersion>
     <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <Name>Sunergeo.KeyValueStorage</Name>
+    <Name>Sunergeo.KeyValueStorage.Aerospike</Name>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -51,23 +51,29 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="KeyValueStore.fs" />
     <Content Include="packages.config" />
-    <Compile Include="MemoryKeyValueStorage.fs" />
+    <Compile Include="AerospikeClient.fs" />
+    <Compile Include="AerospikeKeyValueStore.fs" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="FSharp.Core">
-      <HintPath>..\packages\FSharp.Core.4.2.1\lib\net45\FSharp.Core.dll</HintPath>
+    <Reference Include="AerospikeClient">
+      <HintPath>..\packages\Aerospike.Client.3.4.4\lib\net\AerospikeClient.dll</HintPath>
     </Reference>
     <Reference Include="mscorlib" />
+    <Reference Include="FSharp.Core">
+      <Name>FSharp.Core</Name>
+      <AssemblyName>FSharp.Core.dll</AssemblyName>
+      <HintPath>$(MSBuildProgramFiles32)\Reference Assemblies\Microsoft\FSharp\.NETFramework\v4.0\$(TargetFSharpCoreVersion)\FSharp.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Neo.Lua">
+      <HintPath>..\packages\NeoLua.0.9.14\lib\net4\Neo.Lua.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Numerics" />
-    <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ValueTuple">
-      <HintPath>..\packages\System.ValueTuple.4.3.1\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
+      <HintPath>..\packages\System.ValueTuple.4.3.0\lib\netstandard1.0\System.ValueTuple.dll</HintPath>
     </Reference>
-    <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\FSharpResult\FSharpResult\FSharpResult.fsproj">
@@ -78,6 +84,11 @@
     <ProjectReference Include="..\Sunergeo.Core\Sunergeo.Core.fsproj">
       <Name>Sunergeo.Core</Name>
       <Project>{7a2ead93-127d-4066-af91-bf528097cea9}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.KeyValueStorage\Sunergeo.KeyValueStorage.fsproj">
+      <Name>Sunergeo.KeyValueStorage</Name>
+      <Project>{1f5a780b-974c-4e53-b513-06c73770db0f}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>

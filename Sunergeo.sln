@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.26430.14
+VisualStudioVersion = 15.0.26430.6
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo", "Sunergeo\Sunergeo.fsproj", "{8140AFB6-A2A9-4866-BEF5-AFD7CD841FD7}"
 EndProject
@@ -26,6 +26,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sunergeo.AkkaSignalr.Consumer", "Sunergeo.AkkaSignalr.Consumer\Sunergeo.AkkaSignalr.Consumer.csproj", "{72014EE3-9761-4333-96A2-CAE649B2A8F5}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.EventSourcing.Kafka", "Sunergeo.EventSourcing.Kafka\Sunergeo.EventSourcing.Kafka.fsproj", "{C6D79B49-C915-457A-A6BA-E524CBB0C587}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.KeyValueStorage.Aerospike", "Sunergeo.KeyValueStorage.Aerospike\Sunergeo.KeyValueStorage.Aerospike.fsproj", "{8358D8A6-165B-403B-87D3-DC94BAA55C0C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -81,6 +83,10 @@ Global
 		{C6D79B49-C915-457A-A6BA-E524CBB0C587}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C6D79B49-C915-457A-A6BA-E524CBB0C587}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C6D79B49-C915-457A-A6BA-E524CBB0C587}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8358D8A6-165B-403B-87D3-DC94BAA55C0C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8358D8A6-165B-403B-87D3-DC94BAA55C0C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8358D8A6-165B-403B-87D3-DC94BAA55C0C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8358D8A6-165B-403B-87D3-DC94BAA55C0C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
