@@ -13,7 +13,7 @@ type LogEntry<'Item> = {
     Item: 'Item
 }
 
-type LogConfig<'PartitionId, 'State when 'PartitionId : comparison> = {
+type KafkaLogConfig = {
     Uri: Uri
     Topic: string
     Logger: Sunergeo.Logging.Logger
@@ -25,7 +25,7 @@ type LogError =
 
 type LogTransactionId = string
 
-type ILogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: LogConfig) =
+type KafkaLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: KafkaLogConfig) =
     let toAsync (a:'a): Async<'a> = async { return a }
 
     let kafkaConnection = Kafka.connHost (sprintf "%s:%i" config.Uri.Host config.Uri.Port)

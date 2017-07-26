@@ -28,22 +28,22 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
                 error
 
             |> config.Logger LogLevel.Error
-
-
-    override this.Process(eventLogItem:EventLogItem<'PartitionId, 'Init, 'Events>):unit =
-        let processWithState 
-            (f: Option<'State * 'KeyValueVersion> -> unit)
-            : unit =
-            match config.KeyValueStore.Get partitionId with
-            | Ok x -> f x
-            | Result.Error error ->
-                match error with
-                | ReadError.Timeout -> 
-                    "KeyValueStore timeout"
-                | ReadError.Error error ->
-                    error
-                |> config.Logger LogLevel.Error
             
+    let processWithState 
+        (f: Option<'State * 'KeyValueVersion> -> unit)
+        : unit =
+        match config.KeyValueStore.Get partitionId with
+        | Ok x -> f x
+        | Result.Error error ->
+            match error with
+            | ReadError.Timeout -> 
+                "KeyValueStore timeout"
+            | ReadError.Error error ->
+                error
+            |> config.Logger LogLevel.Error
+            
+    override this.Process(eventLogItem:EventLogItem<'PartitionId, 'Init, 'Events>):unit =
+
         match eventLogItem with
         | EventLogItem.Init init ->
             (function

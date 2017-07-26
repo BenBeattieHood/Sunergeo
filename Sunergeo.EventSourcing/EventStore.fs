@@ -5,13 +5,14 @@ open Sunergeo.Core
 open Sunergeo.EventSourcing.Storage
 
 
-type EventStoreConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
+type EventStoreConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
     Fold: 'State -> 'Events -> 'State
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion>
+    CreateInit: 'PartitionId -> Context -> 'State -> 'Init
+    Implementation: IEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>
 }
 
-type EventStore<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion>) = 
+type EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
     
     member this.Create(context: Context) (partitionId: 'PartitionId) (f: CreateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
         let apply
@@ -25,6 +26,7 @@ type EventStore<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionI
                     {
                         EventSourceInitItem.Id = partitionId
                         EventSourceInitItem.CreatedOn = context.Timestamp
+                        EventSourceInitItem.Init = config.CreateInit partitionId context newState
                     }
                     |> EventLogItem.Init
 

@@ -77,24 +77,22 @@ type MemoryLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>() =
                     |> Map.add transactionId newPartitionsAndItems
             )
 
-type MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
+type MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
     InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion>
     SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'PartitionId, Snapshot<'State>, 'KeyValueVersion>
-    LogUri: Uri
 }
 
-type MemoryEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion>) = 
+type MemoryEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'KeyValueVersion>) = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
 
-    let memoryTopic = new MemoryLogTopic<'PartitionId, EventLogItem<'PartitionId, 'Events>>()
+    let memoryTopic = new MemoryLogTopic<'PartitionId, EventLogItem<'PartitionId, 'Init, 'Events>>()
     
     let append
         (partitionId: 'PartitionId)
-        (getNewStateAndEvents: (Snapshot<'State> * 'KeyValueVersion) option -> Result<'State * (EventLogItem<'PartitionId, 'Events> seq) * ('KeyValueVersion option), Error>)
+        (getNewStateAndEvents: (Snapshot<'State> * 'KeyValueVersion) option -> Result<'State * (EventLogItem<'PartitionId, 'Init, 'Events> seq) * ('KeyValueVersion option), Error>)
         :Async<Result<unit, Error>> =
         
         async {

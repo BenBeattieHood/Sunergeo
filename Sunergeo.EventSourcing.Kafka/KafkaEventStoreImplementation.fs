@@ -6,15 +6,15 @@ open Sunergeo.KeyValueStorage
 open Sunergeo.EventSourcing.Storage
 
 
-type KafkaEventStoreImplementationConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
+type KafkaEventStoreImplementationConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
     InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion>
+    Implementation: IEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>
     SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'PartitionId, Snapshot<'State>, 'KeyValueVersion>
     LogUri: Uri
 }
 
-type KafkaEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'PartitionId, 'State, 'Events, 'KeyValueVersion>) = 
+type KafkaEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
@@ -22,13 +22,14 @@ type KafkaEventStoreImplementation<'PartitionId, 'State, 'Events, 'KeyValueVersi
     let logConfig:KafkaLogConfig = {
         Topic = topic
         Uri = config.LogUri
+        Logger = config.Logger
     }
 
-    let kafkaTopic = new KafkaLogTopic<'PartitionId, EventLogItem<'PartitionId, 'Events>>(logConfig)
+    let kafkaTopic = new KafkaLogTopic<'PartitionId, EventLogItem<'PartitionId, 'Init, 'Events>>(logConfig)
     
     let append
         (partitionId: 'PartitionId)
-        (getNewStateAndEvents: (Snapshot<'State> * 'KeyValueVersion) option -> Result<'State * (EventLogItem<'PartitionId, 'Events> seq) * ('KeyValueVersion option), Error>)
+        (getNewStateAndEvents: (Snapshot<'State> * 'KeyValueVersion) option -> Result<'State * (EventLogItem<'PartitionId, 'Init, 'Events> seq) * ('KeyValueVersion option), Error>)
         :Async<Result<unit, Error>> =
         
         async {

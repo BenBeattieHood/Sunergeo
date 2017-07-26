@@ -4,6 +4,7 @@
 open System
 open Sunergeo.Core
 open Sunergeo.EventSourcing
+open Sunergeo.EventSourcing.Memory
 open Sunergeo.KeyValueStorage
 open Sunergeo.KeyValueStorage.Memory
 open Sunergeo.Logging
@@ -26,24 +27,24 @@ open Sunergeo.Examples.Turtle.Commands
 open Microsoft.AspNetCore.Http
 
 let execCreateCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> ICreateCommand<'PartitionId, 'Events> and 'PartitionId : comparison>
-    (eventSource: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
+    (eventStore: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
     (command: 'Command)
     (context: Context)
     (request: HttpRequest)
     : Result<unit, Error> =
-    eventSource.Create
+    eventStore.Create
         context
         (command.GetId context)
         command.Exec
     |> Async.RunSynchronously
 
 let execCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> IUpdateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison>
-    (eventSource: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
+    (eventStore: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
     (command: IUpdateCommand<'PartitionId, 'State, 'Events>)
     (context: Context)
     (request: HttpRequest)
     : Result<unit, Error> =
-    eventSource.Append
+    eventStore.Append
         context
         (command.GetId context)
         command.Exec
@@ -75,20 +76,26 @@ let main argv =
     sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
     |> Console.WriteLine
 
-    let eventSourceConfig:EventSourceConfig<TurtleId, Turtle, TurtleEvent> = 
+    let eventStoreImplementationConfig:MemoryEventStoreImplementationConfig<TurtleId, Turtle, MemoryKeyValueVersion> = 
         {
             InstanceId = instanceId
-            Create = Turtle.create
-            Fold = Turtle.fold
+            Logger = logger
             SnapshotStore = snapshotStore
-            LogUri = Uri("localhost:9092")
+        }
+    let eventStoreImplementation = MemoryEventStoreImplementation<TurtleId, Turtle, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventStoreImplementationConfig)
+
+    let eventSourceConfig:EventStoreConfig<TurtleId, Turtle, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
+        {
+            CreateInit = (fun _ _ state -> state)
+            Fold = Turtle.fold
+            Implementation = eventStoreImplementation
             Logger = logger
         }
     
-    use eventSource = new Sunergeo.EventSourcing.EventSource<TurtleId, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventSourceConfig)
+    let eventStore = new Sunergeo.EventSourcing.EventStore<TurtleId, Turtle, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventSourceConfig)
 
-    let execCreateCommand = execCreateCommandFor eventSource
-    let execCommand = execCommandFor eventSource
+    let execCreateCommand = execCreateCommandFor eventStore
+    let execCommand = execCommandFor eventStore
 
     sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
     |> Console.WriteLine
