@@ -6,62 +6,51 @@ open Sunergeo.Logging
 open System
 open Akka.Actor
 
-type KafkaMessagePartitionId = int
 
-type ProjectionHostConfig<'ActorConfig, 'PartitionId> = {
+type ProjectionHostConfig<'ActorConfig, 'ProjectionId, 'Init, 'Events, 'PollingActor when 'ProjectionId : comparison> = {
     Logger: Logger
     InstanceId: InstanceId
-    KafkaUri: Uri
     ActorConfig: 'ActorConfig
-    KafkaPollingActorConfig: KafkaPollingActorConfig
-    GetPartitionId: KafkaMessagePartitionId -> 'PartitionId
+    CreatePollingActor: InstanceId -> (('ProjectionId * EventLogItem<'ProjectionId, 'Init, 'Events>) -> unit) -> 'PollingActor
 }
 
 [<AbstractClass>]
-type ProjectionHost<'ActorConfig, 'PartitionId, 'Init, 'State, 'Events when 'PartitionId : comparison>(config: ProjectionHostConfig<'ActorConfig, 'PartitionId>) as this = 
+type ProjectionHost<'ActorConfig, 'ProjectionId, 'Init, 'State, 'Events, 'PollingActor when 'ProjectionId : comparison>(config: ProjectionHostConfig<'ActorConfig, 'ProjectionId, 'Init, 'Events, 'PollingActor>) as this = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
 
-    let kafkaConsumerGroupName = topic + "-group"
-
     let actorSystem = ActorSystem.Create topic
 
-    let mutable actors:Map<'PartitionId, Akka.Actor.IActorRef> = Map.empty
+    let mutable actors:Map<'ProjectionId, Akka.Actor.IActorRef> = Map.empty
     let createOrLoadActor 
-        (partitionId: 'PartitionId)
+        (projectionId: 'ProjectionId)
         : Akka.Actor.IActorRef =
         lock actors
             (fun _ ->
                 actors
-                |> Map.tryFind partitionId
+                |> Map.tryFind projectionId
                 |> Option.defaultWith
                     (fun _ ->
-                        let projectionActorProps = Akka.Actor.Props.Create(System.Func<unit, Projector<'PartitionId, 'Init, 'Events>>(fun _ -> this.CreateActor config.ActorConfig partitionId))
+                        let projectionActorProps = Akka.Actor.Props.Create(System.Func<unit, Projector<'ProjectionId, 'Init, 'Events>>(fun _ -> this.CreateActor config.ActorConfig projectionId))
                         let actor = actorSystem.ActorOf(projectionActorProps)
-                        actors <- actors |> Map.add partitionId actor
+                        actors <- actors |> Map.add projectionId actor
                         actor
                     )
             )
 
-    let onKafkaMessage
-        (pollingActorRef: IActorRef)
-        (message: Confluent.Kafka.Message)
-        :unit =
-        if message.Topic = topic
-        then
-            let partitionId = message.Partition |> config.GetPartitionId
-            let actor = partitionId |> createOrLoadActor
-            let events:EventLogItem<'PartitionId, 'Init, 'Events> = Sunergeo.Core.Todo.todo()
-            actor.Tell(events, pollingActorRef)
-        else
-            sprintf "Received message for unexpected topic %s (listening on %s)" message.Topic topic
-            |> config.Logger LogLevel.Error
-
-    let pollingActorProps = Akka.Actor.Props.Create(System.Func<unit, KafkaPollingActor>(fun _ -> KafkaPollingActor(config.KafkaPollingActorConfig, onKafkaMessage)))
+    let onEvent
+        (
+            (projectionId: 'ProjectionId),
+            (event: EventLogItem<'ProjectionId, 'Init, 'Events>)
+        ):unit =
+        let actor = projectionId |> createOrLoadActor
+        actor.Tell(event)
+            
+    let pollingActorProps = Akka.Actor.Props.Create(System.Func<unit, 'PollingActor>(fun _ -> config.CreatePollingActor config.InstanceId onEvent))
     let pollingActor = actorSystem.ActorOf(pollingActorProps)
     
-    abstract member CreateActor: 'ActorConfig -> 'PartitionId -> Projector<'PartitionId, 'Init, 'Events>
+    abstract member CreateActor: 'ActorConfig -> 'ProjectionId -> Projector<'ProjectionId, 'Init, 'Events>
     
     interface System.IDisposable with
         member this.Dispose() = 

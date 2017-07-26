@@ -20,13 +20,9 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
         | Ok unit -> unit
         | Result.Error error -> 
             match error with
-            | WriteError.Timeout -> 
-                "KeyValueStore timeout"
-            | WriteError.InvalidVersion ->
-                "KeyValueStore invalid version"
-            | WriteError.Error error ->
-                error
-
+            | WriteError.Timeout -> "KeyValueStore timeout"
+            | WriteError.InvalidVersion -> "KeyValueStore invalid version"
+            | WriteError.Error error -> error
             |> config.Logger LogLevel.Error
             
     let processWithState 
@@ -36,10 +32,8 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
         | Ok x -> f x
         | Result.Error error ->
             match error with
-            | ReadError.Timeout -> 
-                "KeyValueStore timeout"
-            | ReadError.Error error ->
-                error
+            | ReadError.Timeout -> "KeyValueStore timeout"
+            | ReadError.Error error -> error
             |> config.Logger LogLevel.Error
             
     override this.Process(eventLogItem:EventLogItem<'PartitionId, 'Init, 'Events>):unit =

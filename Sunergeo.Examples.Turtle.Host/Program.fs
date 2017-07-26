@@ -142,23 +142,25 @@ let main argv =
     |> Console.WriteLine
 
     
-    let readStoreConfig:KeyValueStorageConfig = 
-        {
-            Uri = Uri("localhost:3000")
-            Logger = logger
-            TableName = (instanceId |> Utils.toTopic<Turtle>) + "-ReadStore"
-        }   
+    //let readStoreConfig:KeyValueStorageConfig = 
+    //    {
+    //        Uri = Uri("localhost:3000")
+    //        Logger = logger
+    //        TableName = (instanceId |> Utils.toTopic<Turtle>) + "-ReadStore"
+    //    }
+
+    let readStore = MemoryKeyValueStore()
 
     use akkaSignalr = Sunergeo.AkkaSignalr.Consumer.Program.StartAkkaAndSignalr()
         
-    let kafkaProjectionHostConfig:ProjectionHostConfig<KeyValueStorageProjectionConfig<TurtleId, DefaultReadStore.Turtle, TurtleEvent>, TurtleId> = {
+    let kafkaProjectionHostConfig:ProjectionHostConfig<KeyValueStorageProjectionConfig<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>, TurtleId> = {
         Logger = logger
         InstanceId = instanceId
         KafkaUri = eventSourceConfig.LogUri
         ActorConfig = 
             {
                 Logger = logger
-                KeyValueStorageConfig = readStoreConfig
+                KeyValueStore = readStore
                 CreateState = DefaultReadStore.create
                 FoldState = DefaultReadStore.fold
             }
@@ -172,7 +174,7 @@ let main argv =
         GetPartitionId = string
     }
 
-    use kafkaProjectionHost = new KeyValueStoreProjectorHost<TurtleId, DefaultReadStore.Turtle, TurtleEvent>(kafkaProjectionHostConfig)
+    use kafkaProjectionHost = new KeyValueStoreProjectorHost<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>(kafkaProjectionHostConfig)
         
 
     let queryWebHostConfig:QueryWebHostConfig = 
