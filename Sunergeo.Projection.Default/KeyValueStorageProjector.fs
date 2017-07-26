@@ -10,7 +10,7 @@ type KeyValueStorageProjectionConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyV
     FoldState: 'State -> 'Events -> 'State
     KeyValueStore: IKeyValueStore<'PartitionId, 'State, 'KeyValueVersion>
 }
-type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: KeyValueStorageProjectionConfig<'PartitionId, 'State, 'SourceState, 'Events, 'KeyValueVersion>, partitionId: 'PartitionId) =
+type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: KeyValueStorageProjectionConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>, partitionId: 'PartitionId) =
     inherit Sunergeo.Projection.Projector<'PartitionId, 'Init, 'Events>()
 
     let processWriteResult 
@@ -31,29 +31,48 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
 
 
     override this.Process(eventLogItem:EventLogItem<'PartitionId, 'Init, 'Events>):unit =
+        let processWithState 
+            (f: Option<'State * 'KeyValueVersion> -> unit)
+            : unit =
+            match config.KeyValueStore.Get partitionId with
+            | Ok x -> f x
+            | Result.Error error ->
+                match error with
+                | ReadError.Timeout -> 
+                    "KeyValueStore timeout"
+                | ReadError.Error error ->
+                    error
+                |> config.Logger LogLevel.Error
+            
         match eventLogItem with
         | EventLogItem.Init init ->
-            // TODO - check state doesn't already exist? Maybe silent failure is better in this case
+            (function
+            | Some state ->
+                sprintf "State already present for init %O %O" init state
+                |> config.Logger LogLevel.Error
 
-            //let newState = 
-            //    init
-            //    |> config.CreateState
+            | None ->
+                let newState = 
+                    init
+                    |> config.CreateState
             
-            //let writeResult =
-            //    config.KeyValueStore.Create
-            //        partitionId
-            //        newState
+                let writeResult =
+                    config.KeyValueStore.Create
+                        partitionId
+                        newState
 
-            //writeResult |> processWriteResult
-            ()
+                writeResult |> processWriteResult
+            )
+            |> processWithState
 
         | EventLogItem.Event event ->
-            let state =
-                config.KeyValueStore.Get partitionId
-
-            match state with
-            | Ok (Some (state, version)) ->
+        
+            (function
+            | None ->
+                sprintf "No state found for event %O" event
+                |> config.Logger LogLevel.Error
                 
+            | Some (state, version) ->
                 let newState =
                     event
                     |> config.FoldState state
@@ -64,20 +83,9 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
                         (newState, version)
                         
                 writeResult |> processWriteResult
+            )
+            |> processWithState
 
-            | Ok None ->
-                sprintf "No state found for event %O" event
-                |> config.Logger LogLevel.Error
-
-            | Result.Error error ->
-                match error with
-                | ReadError.Timeout -> 
-                    "KeyValueStore timeout"
-                | ReadError.Error error ->
-                    error
-
-                |> config.Logger LogLevel.Error
-        ()
 
 type KeyValueStoreProjectorHost<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: Sunergeo.Projection.ProjectionHostConfig<KeyValueStorageProjectionConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'PartitionId>) =
     inherit Sunergeo.Projection.ProjectionHost<KeyValueStorageProjectionConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'PartitionId, 'Init, 'State, 'Events>(config)
