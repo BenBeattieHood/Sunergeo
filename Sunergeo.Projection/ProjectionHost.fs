@@ -6,13 +6,15 @@ open Sunergeo.Logging
 open System
 open Akka.Actor
 
+type KafkaMessagePartitionId = int
+
 type ProjectionHostConfig<'ActorConfig, 'PartitionId> = {
     Logger: Logger
     InstanceId: InstanceId
     KafkaUri: Uri
     ActorConfig: 'ActorConfig
     KafkaPollingActorConfig: KafkaPollingActorConfig
-    GetPartitionId: int -> 'PartitionId
+    GetPartitionId: KafkaMessagePartitionId -> 'PartitionId
 }
 
 [<AbstractClass>]

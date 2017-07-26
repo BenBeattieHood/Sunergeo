@@ -15,7 +15,7 @@ module DefaultReadStore =
     }
     
     let create
-        (init: EventSourceInitItem<TurtleId, Turtle>)
+        (init: EventSourceInitItem<TurtleId, 'a>)
         : Turtle =
         {
             TurtleId = init.Id

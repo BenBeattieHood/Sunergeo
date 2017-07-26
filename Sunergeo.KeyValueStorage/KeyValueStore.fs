@@ -20,6 +20,8 @@ type WriteError =
     | InvalidVersion
     | Error of string
 
+
+// Maybe move to FsPickler for speed (https://github.com/neuecc/ZeroFormatter#performance)
 module KeyValueStoreModule =
 
     let serialize

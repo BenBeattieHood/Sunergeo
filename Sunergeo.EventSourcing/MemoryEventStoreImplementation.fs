@@ -90,78 +90,76 @@ type MemoryEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyVa
 
     let memoryTopic = new MemoryLogTopic<'PartitionId, EventLogItem<'PartitionId, 'Init, 'Events>>()
     
-    let append
-        (partitionId: 'PartitionId)
-        (getNewStateAndEvents: (Snapshot<'State> * 'KeyValueVersion) option -> Result<'State * (EventLogItem<'PartitionId, 'Init, 'Events> seq) * ('KeyValueVersion option), Error>)
-        :Async<Result<unit, Error>> =
-        
-        async {
-            let snapshotAndVersion = 
-                partitionId 
-                |> config.SnapshotStore.Get 
+    interface IEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion> with
 
-            let (newState, events, version) = 
-                snapshotAndVersion 
-                |> ResultModule.get 
-                |> getNewStateAndEvents
-                |> ResultModule.get
+        member this.Append partitionId getNewStateAndEvents =
+            async {
+                let snapshotAndVersion = 
+                    partitionId 
+                    |> config.SnapshotStore.Get 
+
+                let (newState, events, version) = 
+                    snapshotAndVersion 
+                    |> ResultModule.get 
+                    |> getNewStateAndEvents
+                    |> ResultModule.get
             
-            let transactionId = memoryTopic.BeginTransaction()
+                let transactionId = memoryTopic.BeginTransaction()
             
-            try
-                for event in events do
-                    memoryTopic.Add(transactionId, partitionId, event)
+                try
+                    for event in events do
+                        memoryTopic.Add(transactionId, partitionId, event)
                     
-                let position = events |> Seq.length |> int64
+                    let position = events |> Seq.length |> int64
 
-                let snapshot = {
-                    Snapshot.Position = position
-                    Snapshot.State = newState
-                }
+                    let snapshot = {
+                        Snapshot.Position = position
+                        Snapshot.State = newState
+                    }
 
-                let snapshotPutResult =
-                    match version with
-                    | None ->
-                        config.SnapshotStore.Create
-                            partitionId
-                            snapshot
+                    let snapshotPutResult =
+                        match version with
+                        | None ->
+                            config.SnapshotStore.Create
+                                partitionId
+                                snapshot
 
-                    | Some version ->
-                        config.SnapshotStore.Put
-                            partitionId
-                            (snapshot, version)
+                        | Some version ->
+                            config.SnapshotStore.Put
+                                partitionId
+                                (snapshot, version)
 
-                do snapshotPutResult |> ResultModule.get
+                    do snapshotPutResult |> ResultModule.get
                 
-                do memoryTopic.CommitTransaction(transactionId)
+                    do memoryTopic.CommitTransaction(transactionId)
 
-                return () |> Result.Ok
-            with
-                //| :? ResultModule.ResultException<Sunergeo.EventSourcing.Storage.LogError> as resultException ->
-                //    do! memoryTopic.AbortTransaction()
-                //    return 
-                //        match resultException.Error with
-                //        | Timeout ->
-                //            Error. Result.Error
+                    return () |> Result.Ok
+                with
+                    //| :? ResultModule.ResultException<Sunergeo.EventSourcing.Storage.LogError> as resultException ->
+                    //    do! memoryTopic.AbortTransaction()
+                    //    return 
+                    //        match resultException.Error with
+                    //        | Timeout ->
+                    //            Error. Result.Error
 
-                | :? ResultModule.ResultException<Sunergeo.KeyValueStorage.WriteError> as resultException ->
-                    do memoryTopic.AbortTransaction(transactionId)
+                    | :? ResultModule.ResultException<Sunergeo.KeyValueStorage.WriteError> as resultException ->
+                        do memoryTopic.AbortTransaction(transactionId)
 
-                    return 
-                        match resultException.Error with
-                        | Sunergeo.KeyValueStorage.WriteError.Timeout -> 
-                            Sunergeo.Core.Todo.todo()
+                        return 
+                            match resultException.Error with
+                            | Sunergeo.KeyValueStorage.WriteError.Timeout -> 
+                                Sunergeo.Core.Todo.todo()
 
-                        | Sunergeo.KeyValueStorage.WriteError.InvalidVersion -> 
-                            Sunergeo.Core.Todo.todo()
+                            | Sunergeo.KeyValueStorage.WriteError.InvalidVersion -> 
+                                Sunergeo.Core.Todo.todo()
 
-                        | Sunergeo.KeyValueStorage.WriteError.Error error -> 
-                            error 
-                            |> Sunergeo.Core.Error.InvalidOp 
-                            |> Result.Error
+                            | Sunergeo.KeyValueStorage.WriteError.Error error -> 
+                                error 
+                                |> Sunergeo.Core.Error.InvalidOp 
+                                |> Result.Error
 
-                | _ as ex ->
-                    do memoryTopic.AbortTransaction(transactionId)
-                    return Sunergeo.Core.NotImplemented.NotImplemented() //This needs transaction support
+                    | _ as ex ->
+                        do memoryTopic.AbortTransaction(transactionId)
+                        return Sunergeo.Core.NotImplemented.NotImplemented() //This needs transaction support
 
-        }
+            }

@@ -5,6 +5,7 @@ open System
 open Sunergeo.Core
 open Sunergeo.EventSourcing
 open Sunergeo.EventSourcing.Memory
+open Sunergeo.EventSourcing.Storage
 open Sunergeo.KeyValueStorage
 open Sunergeo.KeyValueStorage.Memory
 open Sunergeo.Logging
@@ -26,8 +27,8 @@ open Sunergeo.Examples.Turtle.Aggregate
 open Sunergeo.Examples.Turtle.Commands
 open Microsoft.AspNetCore.Http
 
-let execCreateCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> ICreateCommand<'PartitionId, 'Events> and 'PartitionId : comparison>
-    (eventStore: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
+let execCreateCommandFor<'PartitionId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> ICreateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison and 'KeyValueVersion : comparison>
+    (eventStore: Sunergeo.EventSourcing.EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>)
     (command: 'Command)
     (context: Context)
     (request: HttpRequest)
@@ -38,8 +39,8 @@ let execCreateCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :
         command.Exec
     |> Async.RunSynchronously
 
-let execCommandFor<'PartitionId, 'State, 'Events, 'Command when 'Command :> IUpdateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison>
-    (eventStore: Sunergeo.EventSourcing.EventSource<'PartitionId, 'State, 'Events>)
+let execCommandFor<'PartitionId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> IUpdateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison and 'KeyValueVersion : comparison>
+    (eventStore: Sunergeo.EventSourcing.EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>)
     (command: IUpdateCommand<'PartitionId, 'State, 'Events>)
     (context: Context)
     (request: HttpRequest)
@@ -64,17 +65,17 @@ let main argv =
     sprintf "Starting server..."
     |> Console.WriteLine
 
-    let snapshotStoreConfig:KeyValueStorageConfig = 
-        {
-            Uri = Uri("localhost:3000")
-            Logger = logger
-            TableName = instanceId |> Utils.toTopic<Turtle>
-        }
+    //let snapshotStoreConfig:KeyValueStorageConfig = 
+    //    {
+    //        Uri = Uri("localhost:3000")
+    //        Logger = logger
+    //        TableName = instanceId |> Utils.toTopic<Turtle>
+    //    }
 
-    use snapshotStore = new MemoryKeyValueStore<TurtleId, Snapshot<Turtle>>(snapshotStoreConfig)
+    let snapshotStore = new MemoryKeyValueStore<TurtleId, Snapshot<Turtle>>()
 
-    sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
-    |> Console.WriteLine
+    //sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
+    //|> Console.WriteLine
 
     let eventStoreImplementationConfig:MemoryEventStoreImplementationConfig<TurtleId, Turtle, MemoryKeyValueVersion> = 
         {
@@ -97,8 +98,8 @@ let main argv =
     let execCreateCommand = execCreateCommandFor eventStore
     let execCommand = execCommandFor eventStore
 
-    sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
-    |> Console.WriteLine
+    //sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
+    //|> Console.WriteLine
     
     let commandWebHostConfig:CommandWebHostConfig<TurtleId, State.Turtle, TurtleEvent> = 
         {

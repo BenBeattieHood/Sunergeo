@@ -18,12 +18,12 @@ type LogError =
     Timeout
     | Error of string
 
-type EventStoreProcess<'PartitionId, 'Init, 'State, 'Events when 'PartitionId : comparison> = 
-    (Snapshot<'State> * int) option -> Result<'State * (EventLogItem<'PartitionId, 'Init, 'Events> seq) * (int option), Error>
+type EventStoreProcess<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = 
+    (Snapshot<'State> * 'KeyValueVersion) option -> Result<'State * (EventLogItem<'PartitionId, 'Init, 'Events> seq) * ('KeyValueVersion option), Error>
 
 type IEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> =
     
     abstract member Append:
         'PartitionId ->
-        EventStoreProcess<'PartitionId, 'Init, 'State, 'Events> ->
+        EventStoreProcess<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion> ->
         Async<Result<unit, Error>>

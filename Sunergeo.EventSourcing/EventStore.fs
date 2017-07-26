@@ -54,7 +54,7 @@ type EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Par
         let apply
             (snapshot: Snapshot<'State>)
             (newEvents: 'Events seq)
-            (version: int)
+            (version: 'KeyValueVersion)
             =
             let newState = 
                 newEvents
