@@ -6,15 +6,15 @@ open Sunergeo.KeyValueStorage
 open Sunergeo.EventSourcing.Storage
 
 
-type KafkaEventStoreImplementationConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
+type KafkaEventStoreImplementationConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>
-    SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'PartitionId, Snapshot<'State>, 'KeyValueVersion>
+    Implementation: IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>
+    SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
     LogUri: Uri
 }
 
-type KafkaEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
+type KafkaEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
@@ -25,14 +25,14 @@ type KafkaEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyVal
         Logger = config.Logger
     }
 
-    let kafkaTopic = new KafkaLogTopic<'PartitionId, EventLogItem<'PartitionId, 'Init, 'Events>>(logConfig)
+    let kafkaTopic = new KafkaLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>>(logConfig)
     
-    interface IEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion> with
+    interface IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion> with
 
-        member this.Append partitionId getNewStateAndEvents =
+        member this.Append aggregateId getNewStateAndEvents =
             async {
                 let snapshotAndVersion = 
-                    partitionId 
+                    aggregateId 
                     |> config.SnapshotStore.Get 
 
                 let (newState, events, version) = 
@@ -47,7 +47,7 @@ type KafkaEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyVal
                     let mutable position = 0 |> int64
                 
                     for event in events do
-                        let! positionResult = kafkaTopic.Add(partitionId, event)
+                        let! positionResult = kafkaTopic.Add(aggregateId, event)
                         position <- (positionResult |> ResultModule.get)    
                     
                     let snapshot = {
@@ -59,12 +59,12 @@ type KafkaEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyVal
                         match version with
                         | None ->
                             config.SnapshotStore.Create
-                                partitionId
+                                aggregateId
                                 snapshot
 
                         | Some version ->
                             config.SnapshotStore.Put
-                                partitionId
+                                aggregateId
                                 (snapshot, version)
 
                     do snapshotPutResult |> ResultModule.get

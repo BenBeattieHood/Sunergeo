@@ -27,8 +27,8 @@ open Sunergeo.Examples.Turtle.Aggregate
 open Sunergeo.Examples.Turtle.Commands
 open Microsoft.AspNetCore.Http
 
-let execCreateCommandFor<'PartitionId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> ICreateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison and 'KeyValueVersion : comparison>
-    (eventStore: Sunergeo.EventSourcing.EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>)
+let execCreateCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> ICreateCommand<'AggregateId, 'State, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
+    (eventStore: Sunergeo.EventSourcing.EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>)
     (command: 'Command)
     (context: Context)
     (request: HttpRequest)
@@ -39,9 +39,9 @@ let execCreateCommandFor<'PartitionId, 'Init, 'State, 'Events, 'Command, 'KeyVal
         command.Exec
     |> Async.RunSynchronously
 
-let execCommandFor<'PartitionId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> IUpdateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison and 'KeyValueVersion : comparison>
-    (eventStore: Sunergeo.EventSourcing.EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>)
-    (command: IUpdateCommand<'PartitionId, 'State, 'Events>)
+let execCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> IUpdateCommand<'AggregateId, 'State, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
+    (eventStore: Sunergeo.EventSourcing.EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>)
+    (command: IUpdateCommand<'AggregateId, 'State, 'Events>)
     (context: Context)
     (request: HttpRequest)
     : Result<unit, Error> =

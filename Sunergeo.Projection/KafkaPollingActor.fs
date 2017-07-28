@@ -7,15 +7,15 @@ open System
 open Akka.Actor
 
 type KafkaPartitionId = int
-type KafkaPollingActorConfig<'ProjectionId, 'Init, 'Events when 'ProjectionId : comparison> = {
+type KafkaPollingActorConfig<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = {
     InstanceId: InstanceId
     Logger: Logger
     AutoCommitIntervalMs: int option
     StatisticsIntervalMs: int
     Servers: Uri[]
-    GetProjectionId: KafkaPartitionId -> 'ProjectionId
+    GetProjectionId: KafkaPartitionId -> 'AggregateId
 }
-type KafkaPollingActor<'ProjectionId, 'Init, 'State, 'Events when 'ProjectionId : comparison>(config: KafkaPollingActorConfig<'ProjectionId, 'Init, 'Events>, onEvent: ('ProjectionId * EventLogItem<'ProjectionId, 'Init, 'Events>) -> unit) as this =
+type KafkaPollingActor<'AggregateId, 'Init, 'State, 'Events when 'AggregateId : comparison>(config: KafkaPollingActorConfig<'AggregateId, 'Init, 'Events>, onEvent: ('AggregateId * EventLogItem<'AggregateId, 'Init, 'Events>) -> unit) as this =
     inherit ReceiveActor()
 
     let kvp 
@@ -27,9 +27,9 @@ type KafkaPollingActor<'ProjectionId, 'Init, 'State, 'Events when 'ProjectionId 
     let onKafkaMessage
         (message: Confluent.Kafka.Message)
         :unit =
-        let projectionId = message.Partition |> config.GetProjectionId
-        let events:EventLogItem<'ProjectionId, 'Init, 'Events> = Sunergeo.Core.Todo.todo()
-        (projectionId, events) |> onEvent
+        let aggregateId = message.Partition |> config.GetProjectionId
+        let events:EventLogItem<'AggregateId, 'Init, 'Events> = Sunergeo.Core.Todo.todo()
+        (aggregateId, events) |> onEvent
 
     let topic = 
         config.InstanceId 
@@ -68,9 +68,9 @@ type KafkaPollingActor<'ProjectionId, 'Init, 'State, 'Events when 'ProjectionId 
     let self = this.Self
     do consumer.Subscribe([ "tuneup" ]);
     do this.Receive<unit>
-        (fun message -> 
+        (fun _ -> 
             consumer.Poll(TimeSpan.FromSeconds 5.0)
-            self.Tell(message)
+            self.Tell(())
         )
 
     override this.PreStart() =

@@ -25,17 +25,17 @@ type LogError =
 
 type LogTransactionId = string
 
-type KafkaLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: KafkaLogConfig) =
+type KafkaLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>(config: KafkaLogConfig) =
     let toAsync (a:'a): Async<'a> = async { return a }
 
     let kafkaConnection = Kafka.connHost (sprintf "%s:%i" config.Uri.Host config.Uri.Port)
-    let producerMap : Map<'PartitionId, Producer> = Map.empty
+    let producerMap : Map<'AggregateId, Producer> = Map.empty
         
-    let createProducer (partitionId: 'PartitionId) =
+    let createProducer (aggregateId: 'AggregateId) =
         let producerCfg =
               ProducerConfig.create (
                 topic = config.Topic, 
-                partition = Partitioner.konst (hash partitionId), 
+                partition = Partitioner.konst (hash aggregateId), 
                 requiredAcks = RequiredAcks.Local)
 
         let producer =
@@ -62,20 +62,20 @@ type KafkaLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: K
             return Sunergeo.Core.NotImplemented.NotImplemented()
         }
 
-    member this.Add(partitionId: 'PartitionId, item: 'Item): Async<Result<int64, LogError>> =
+    member this.Add(aggregateId: 'AggregateId, item: 'Item): Async<Result<int64, LogError>> =
         async {
             let producer = 
                 lock producerMap
                     (fun _ ->
                         producerMap
-                        |> Map.tryFind partitionId
+                        |> Map.tryFind aggregateId
                         |> Option.defaultWith
                             (fun _ -> 
                                 let producer = 
-                                    partitionId 
+                                    aggregateId 
                                     |> createProducer
 
-                                producerMap.Add(partitionId, producer) 
+                                producerMap.Add(aggregateId, producer) 
                                 |> ignore
 
                                 producer
@@ -90,7 +90,7 @@ type KafkaLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>(config: K
             return (int64)result.offset |> Result.Ok
         }
 
-    //member this.ReadFrom(partitionId: 'PartitionId, positionId: int64): Async<Result<LogEntry<'Item> seq, LogError>> =
+    //member this.ReadFrom(aggregateId: 'AggregateId, positionId: int64): Async<Result<LogEntry<'Item> seq, LogError>> =
 
     //    let consumerFunc (state:ConsumerState) (messageSet:ConsumerMessageSet): Async<unit> = 
     //        async {

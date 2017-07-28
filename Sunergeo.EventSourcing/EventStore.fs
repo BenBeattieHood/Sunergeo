@@ -5,16 +5,16 @@ open Sunergeo.Core
 open Sunergeo.EventSourcing.Storage
 
 
-type EventStoreConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
+type EventStoreConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     Fold: 'State -> 'Events -> 'State
     Logger: Sunergeo.Logging.Logger
-    CreateInit: 'PartitionId -> Context -> 'State -> 'Init
-    Implementation: IEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>
+    CreateInit: 'AggregateId -> Context -> 'State -> 'Init
+    Implementation: IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>
 }
 
-type EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
+type EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
     
-    member this.Create(context: Context) (partitionId: 'PartitionId) (f: CreateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
+    member this.Create(context: Context) (aggregateId: 'AggregateId) (f: CreateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
         let apply
             (
                 (newState: 'State),
@@ -24,9 +24,9 @@ type EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Par
             let newEvents = seq {
                 yield 
                     {
-                        EventSourceInitItem.Id = partitionId
+                        EventSourceInitItem.Id = aggregateId
                         EventSourceInitItem.CreatedOn = context.Timestamp
-                        EventSourceInitItem.Init = config.CreateInit partitionId context newState
+                        EventSourceInitItem.Init = config.CreateInit aggregateId context newState
                     }
                     |> EventLogItem.Init
 
@@ -37,7 +37,7 @@ type EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Par
 
             newState, newEvents, None
 
-        config.Implementation.Append partitionId
+        config.Implementation.Append aggregateId
             (fun snapshotAndVersion ->
                 match snapshotAndVersion with
                 | Some snapshotAndVersion ->
@@ -50,7 +50,7 @@ type EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Par
                     |> ResultModule.map apply
             )
 
-    member this.Append(context: Context) (partitionId: 'PartitionId) (f: UpdateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
+    member this.Append(context: Context) (aggregateId: 'AggregateId) (f: UpdateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
         let apply
             (snapshot: Snapshot<'State>)
             (newEvents: 'Events seq)
@@ -62,7 +62,7 @@ type EventStore<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Par
 
             newState, (newEvents |> Seq.map EventLogItem.Event), (version |> Some)
 
-        config.Implementation.Append partitionId
+        config.Implementation.Append aggregateId
             (fun snapshotAndVersion ->
                 match snapshotAndVersion with
                 | None -> 

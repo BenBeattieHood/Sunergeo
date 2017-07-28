@@ -6,14 +6,14 @@ open Sunergeo.Logging
 open System
 open Akka.Actor
 
-type MemoryEventSourcePartitionId = int
-type MemoryEventSourcePollingActorConfig<'ProjectionId, 'Init, 'Events when 'ProjectionId : comparison> = {
+type EventSourcePartitionId = int
+type EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = {
     InstanceId: InstanceId
     Logger: Logger
-    MemoryEventSource: Sunergeo.
-    GetProjectionId: MemoryEventSourcePartitionId -> 'ProjectionId
+    EventSource: Sunergeo.EventSourcing.Memory.IEventSource<'AggregateId, 'Init, 'Events>
+    GetProjectionId: EventSourcePartitionId -> 'AggregateId
 }
-type MemoryEventSourcePollingActor<'ProjectionId, 'Init, 'State, 'Events when 'ProjectionId : comparison>(config: MemoryEventSourcePollingActorConfig<'ProjectionId, 'Init, 'Events>, onEvent: ('ProjectionId * EventLogItem<'ProjectionId, 'Init, 'Events>) -> unit) as this =
+type EventSourcePollingActor<'AggregateId, 'Init, 'State, 'Events when 'AggregateId : comparison>(config: EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events>, onEvent: ('AggregateId * EventLogItem<'AggregateId, 'Init, 'Events>) -> unit) as this =
     inherit ReceiveActor()
 
     let kvp 
@@ -22,31 +22,30 @@ type MemoryEventSourcePollingActor<'ProjectionId, 'Init, 'State, 'Events when 'P
         let key, value = keyAndValue
         System.Collections.Generic.KeyValuePair(key, value)
         
-    let onMemoryEventSourceMessage
-        (message: Confluent.MemoryEventSource.Message)
+    let onEventSourceMessage
+        (message: Confluent.EventSource.Message)
         :unit =
-        let projectionId = message.Partition |> config.GetProjectionId
-        let events:EventLogItem<'ProjectionId, 'Init, 'Events> = Sunergeo.Core.Todo.todo()
-        (projectionId, events) |> onEvent
+        let aggregateId = message.Partition |> config.GetProjectionId
+        let events:EventLogItem<'AggregateId, 'Init, 'Events> = Sunergeo.Core.Todo.todo()
+        (aggregateId, events) |> onEvent
 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
         
-    let consumer = new Confluent.MemoryEventSource.Consumer(consumerConfiguration)
+    let consumer = new Confluent.EventSource.Consumer(consumerConfiguration)
 
     do consumer.OnMessage.Add 
         (fun message ->
             if message.Topic = topic
             then 
-                message |> onMemoryEventSourceMessage
+                message |> onEventSourceMessage
             else
                 sprintf "Received message for unexpected topic %s (listening on %s)" message.Topic topic
                 |> config.Logger LogLevel.Error
         )
             
     let self = this.Self
-    do consumer.Subscribe([ "tuneup" ]);
     do this.Receive<unit>
         (fun message -> 
             consumer.Poll(TimeSpan.FromSeconds 5.0)
@@ -56,8 +55,4 @@ type MemoryEventSourcePollingActor<'ProjectionId, 'Init, 'State, 'Events when 'P
     override this.PreStart() =
         ReceiveActor.Context.System.Scheduler.ScheduleTellOnce(TimeSpan.FromMilliseconds(100.0), self, (), ActorRefs.Nobody)
         base.PreStart()
-    
-    override this.PostStop() =
-        consumer.Dispose()
-        base.PostStop()
     

@@ -10,10 +10,10 @@ open Routing
 //    LogName: string
 //}
 
-type RoutedCommand<'Command, 'PartitionId when 'Command :> ICommandBase<'PartitionId> and 'PartitionId : comparison> =
+type RoutedCommand<'Command, 'AggregateId when 'Command :> ICommandBase<'AggregateId> and 'AggregateId : comparison> =
     RoutedType<'Command, unit>
 
-//type RoutedCommand<'Command, 'PartitionId, 'State, 'Events when 'Command :> IUpdateCommand<'PartitionId, 'State, 'Events> and 'PartitionId : comparison> =
+//type RoutedCommand<'Command, 'AggregateId, 'State, 'Events when 'Command :> IUpdateCommand<'AggregateId, 'State, 'Events> and 'AggregateId : comparison> =
 //    RoutedType<'Command, UpdateCommandResult<'Events>>
 
 type CommandHandler = RoutedTypeRequestHandler<unit>
@@ -25,14 +25,14 @@ open Microsoft.AspNetCore.Http
 open Sunergeo.Logging
 open Microsoft.Extensions.DependencyInjection
 
-//, 'CreateCommand, 'UpdateCommand and 'CreateCommand :> ICreateCommand<'PartitionId, 'Events> and 'UpdateCommand :> IUpdateCommand<'PartitionId, 'State, 'Events>
-type CommandWebHostStartupConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
+//, 'CreateCommand, 'UpdateCommand and 'CreateCommand :> ICreateCommand<'AggregateId, 'Events> and 'UpdateCommand :> IUpdateCommand<'AggregateId, 'State, 'Events>
+type CommandWebHostStartupConfig<'AggregateId, 'State, 'Events when 'AggregateId : comparison> = {
     Logger: Sunergeo.Logging.Logger
     ContextProvider: HttpContext -> Context
     Handlers: CommandHandler list
 }
 
-type CommandWebHostStartup<'PartitionId, 'State, 'Events when 'PartitionId : comparison> (config: CommandWebHostStartupConfig<'PartitionId, 'State, 'Events>) = 
+type CommandWebHostStartup<'AggregateId, 'State, 'Events when 'AggregateId : comparison> (config: CommandWebHostStartupConfig<'AggregateId, 'State, 'Events>) = 
 
     member x.Configure 
         (
@@ -66,28 +66,28 @@ type CommandWebHostStartup<'PartitionId, 'State, 'Events when 'PartitionId : com
 
         app.Run(RequestDelegate(reqHandler))
 
-type CommandWebHostConfig<'PartitionId, 'State, 'Events> = {
+type CommandWebHostConfig<'AggregateId, 'State, 'Events> = {
     Logger: Sunergeo.Logging.Logger
     Handlers: CommandHandler list
     BaseUri: Uri
 }
 
 module CommandWebHost =
-    let toGeneralRoutedCommand<'Command, 'PartitionId when 'Command :> ICommandBase<'PartitionId> and 'PartitionId : comparison>
-        (routedCommand: RoutedCommand<'Command, 'PartitionId>)
-        :RoutedCommand<ICommandBase<'PartitionId>, 'PartitionId> =
+    let toGeneralRoutedCommand<'Command, 'AggregateId when 'Command :> ICommandBase<'AggregateId> and 'AggregateId : comparison>
+        (routedCommand: RoutedCommand<'Command, 'AggregateId>)
+        :RoutedCommand<ICommandBase<'AggregateId>, 'AggregateId> =
         {
             RoutedCommand.PathAndQuery = routedCommand.PathAndQuery
             RoutedCommand.HttpMethod = routedCommand.HttpMethod
             RoutedCommand.Exec = 
-                (fun (wrappedTarget: ICommandBase<'PartitionId>) (context: Context) ->
+                (fun (wrappedTarget: ICommandBase<'AggregateId>) (context: Context) ->
                     routedCommand.Exec (wrappedTarget :?> 'Command) context
                 )
         }
 
-    let create<'PartitionId, 'State, 'Events when 'PartitionId : comparison> (config: CommandWebHostConfig<'PartitionId, 'State, 'Events>): IWebHost =
+    let create<'AggregateId, 'State, 'Events when 'AggregateId : comparison> (config: CommandWebHostConfig<'AggregateId, 'State, 'Events>): IWebHost =
             
-        let startupConfig:CommandWebHostStartupConfig<'PartitionId, 'State, 'Events> =
+        let startupConfig:CommandWebHostStartupConfig<'AggregateId, 'State, 'Events> =
             {
                 Logger = config.Logger
                 Handlers = config.Handlers
@@ -102,9 +102,9 @@ module CommandWebHost =
             }
 
         WebHostBuilder()
-            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig<'PartitionId, 'State, 'Events>>(startupConfig) |> ignore)
+            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig<'AggregateId, 'State, 'Events>>(startupConfig) |> ignore)
             .UseKestrel()
-            .UseStartup<CommandWebHostStartup<'PartitionId, 'State, 'Events>>()
+            .UseStartup<CommandWebHostStartup<'AggregateId, 'State, 'Events>>()
             .UseUrls(config.BaseUri |> string)
             .Build()
       

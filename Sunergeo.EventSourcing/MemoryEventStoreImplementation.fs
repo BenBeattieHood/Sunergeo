@@ -9,10 +9,10 @@ open Sunergeo.EventSourcing.Storage
 
 type MemoryLogTransactionId = Guid
 
-type MemoryLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>() =
+type MemoryLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>() =
     
-    let mutable eventSource:Map<'PartitionId, LogEntry<'Item> seq> = Map.empty
-    let mutable transactions:Map<MemoryLogTransactionId, ('PartitionId * 'Item) seq> = Map.empty
+    let mutable eventSource:Map<'AggregateId, LogEntry<'Item> seq> = Map.empty
+    let mutable transactions:Map<MemoryLogTransactionId, ('AggregateId * 'Item) seq> = Map.empty
 
     member this.BeginTransaction(): MemoryLogTransactionId =
         Guid.NewGuid().ToByteArray() |> MemoryLogTransactionId
@@ -34,17 +34,17 @@ type MemoryLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>() =
                     |> Map.tryFind transactionId
                     |> Option.defaultValue Seq.empty
                     |> Seq.groupBy
-                        (fun (partitionId, _) -> partitionId)
+                        (fun (aggregateId, _) -> aggregateId)
                     |> Seq.map
                         (fun (a, items) -> a, items |> Seq.map snd) /// there should be a Seq.groupBy alternative for this
 
                 lock eventSource
                     (fun _ ->
-                        for (partitionId, items) in partitionItems do
+                        for (aggregateId, items) in partitionItems do
 
                             let partition =
                                 eventSource
-                                |> Map.tryFind partitionId
+                                |> Map.tryFind aggregateId
                                 |> Option.defaultValue Seq.empty
                 
                             let partitionLength = 
@@ -55,7 +55,7 @@ type MemoryLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>() =
                                 eventSource <- 
                                     eventSource 
                                     |> Map.add 
-                                        partitionId 
+                                        aggregateId 
                                         (
                                             partition 
                                             |> Seq.append [ { Position = partitionLength + index; Item = item } ]
@@ -63,39 +63,68 @@ type MemoryLogTopic<'PartitionId, 'Item when 'PartitionId : comparison>() =
                     )
             )
 
-    member this.Add(transactionId: MemoryLogTransactionId, partitionId: 'PartitionId, item: 'Item): unit =
+    member this.Add
+        (transactionId: MemoryLogTransactionId)
+        (aggregateId: 'AggregateId)
+        (item: 'Item)
+        : unit =
+
         lock transactions
             (fun _ ->
                 let newPartitionsAndItems =
                     transactions
                     |> Map.tryFind transactionId
                     |> Option.defaultValue Seq.empty
-                    |> Seq.append [ (partitionId, item) ]
+                    |> Seq.append [ (aggregateId, item) ]
 
                 transactions <-
                     transactions
                     |> Map.add transactionId newPartitionsAndItems
             )
 
-type MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
+    member this.GetPartitionIds(): 'AggregateId seq =
+        eventSource
+        |> Map.toSeq
+        |> Seq.map fst
+
+    member this.ReadFrom
+        (aggregateId: 'AggregateId)
+        (position: int)
+        : LogEntry<'Item> seq option =
+
+        eventSource
+        |> Map.tryFind aggregateId
+
+type MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
-    SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'PartitionId, Snapshot<'State>, 'KeyValueVersion>
+    SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
 }
 
-type MemoryEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'PartitionId, 'State, 'KeyValueVersion>) = 
+type IEventSource<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> =
+    abstract member GetPartitionIds: unit -> 'AggregateId seq
+    abstract member ReadFrom: 'AggregateId -> int -> LogEntry<EventLogItem<'AggregateId, 'Init, 'Events>> seq option
+
+type MemoryEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion>) = 
     let topic = 
         config.InstanceId 
         |> Utils.toTopic<'State>
 
-    let memoryTopic = new MemoryLogTopic<'PartitionId, EventLogItem<'PartitionId, 'Init, 'Events>>()
+    let memoryTopic = new MemoryLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>>()
     
-    interface IEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion> with
+    interface IEventSource<'AggregateId, 'Init, 'Events> with
+        member this.GetPartitionIds () =
+            memoryTopic.GetPartitionIds()
 
-        member this.Append partitionId getNewStateAndEvents =
+        member this.ReadFrom aggregateId position =
+            memoryTopic.ReadFrom aggregateId position
+
+    interface IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion> with
+
+        member this.Append aggregateId getNewStateAndEvents =
             async {
                 let snapshotAndVersion = 
-                    partitionId 
+                    aggregateId 
                     |> config.SnapshotStore.Get 
 
                 let (newState, events, version) = 
@@ -108,7 +137,7 @@ type MemoryEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyVa
             
                 try
                     for event in events do
-                        memoryTopic.Add(transactionId, partitionId, event)
+                        memoryTopic.Add(transactionId, aggregateId, event)
                     
                     let position = events |> Seq.length |> int64
 
@@ -121,12 +150,12 @@ type MemoryEventStoreImplementation<'PartitionId, 'Init, 'State, 'Events, 'KeyVa
                         match version with
                         | None ->
                             config.SnapshotStore.Create
-                                partitionId
+                                aggregateId
                                 snapshot
 
                         | Some version ->
                             config.SnapshotStore.Put
-                                partitionId
+                                aggregateId
                                 (snapshot, version)
 
                     do snapshotPutResult |> ResultModule.get

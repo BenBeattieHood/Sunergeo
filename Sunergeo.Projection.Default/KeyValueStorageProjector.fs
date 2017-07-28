@@ -4,14 +4,14 @@ open Sunergeo.Core
 open Sunergeo.Logging
 open Sunergeo.KeyValueStorage
 
-type KeyValueStorageProjectionConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison> = {
+type KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     Logger: Logger
-    CreateState: EventSourceInitItem<'PartitionId, 'Init> -> 'State
+    CreateState: EventSourceInitItem<'AggregateId, 'Init> -> 'State
     FoldState: 'State -> 'Events -> 'State
-    KeyValueStore: IKeyValueStore<'PartitionId, 'State, 'KeyValueVersion>
+    KeyValueStore: IKeyValueStore<'AggregateId, 'State, 'KeyValueVersion>
 }
-type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: KeyValueStorageProjectionConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>, partitionId: 'PartitionId) =
-    inherit Sunergeo.Projection.Projector<'PartitionId, 'Init, 'Events>()
+type KeyValueStoreProjector<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, aggregateId: 'AggregateId) =
+    inherit Sunergeo.Projection.Projector<'AggregateId, 'Init, 'Events>()
 
     let processWriteResult 
         (writeResult: Result<unit, WriteError>)
@@ -28,7 +28,7 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
     let processWithState 
         (f: Option<'State * 'KeyValueVersion> -> unit)
         : unit =
-        match config.KeyValueStore.Get partitionId with
+        match config.KeyValueStore.Get aggregateId with
         | Ok x -> f x
         | Result.Error error ->
             match error with
@@ -36,7 +36,7 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
             | ReadError.Error error -> error
             |> config.Logger LogLevel.Error
             
-    override this.Process(eventLogItem:EventLogItem<'PartitionId, 'Init, 'Events>):unit =
+    override this.Process(eventLogItem:EventLogItem<'AggregateId, 'Init, 'Events>):unit =
 
         match eventLogItem with
         | EventLogItem.Init init ->
@@ -52,7 +52,7 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
             
                 let writeResult =
                     config.KeyValueStore.Create
-                        partitionId
+                        aggregateId
                         newState
 
                 writeResult |> processWriteResult
@@ -73,7 +73,7 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
 
                 let writeResult = 
                     config.KeyValueStore.Put
-                        partitionId
+                        aggregateId
                         (newState, version)
                         
                 writeResult |> processWriteResult
@@ -81,6 +81,6 @@ type KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersi
             |> processWithState
 
 
-type KeyValueStoreProjectorHost<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion when 'PartitionId : comparison and 'KeyValueVersion : comparison>(config: Sunergeo.Projection.ProjectionHostConfig<KeyValueStorageProjectionConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'PartitionId>) =
-    inherit Sunergeo.Projection.ProjectionHost<KeyValueStorageProjectionConfig<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'PartitionId, 'Init, 'State, 'Events>(config)
-    override this.CreateActor config partitionId = upcast new KeyValueStoreProjector<'PartitionId, 'Init, 'State, 'Events, 'KeyValueVersion>(config, partitionId)
+type KeyValueStoreProjectorHost<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: Sunergeo.Projection.ProjectionHostConfig<KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'AggregateId>) =
+    inherit Sunergeo.Projection.ProjectionHost<KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'AggregateId, 'Init, 'State, 'Events>(config)
+    override this.CreateActor config aggregateId = upcast new KeyValueStoreProjector<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>(config, aggregateId)
