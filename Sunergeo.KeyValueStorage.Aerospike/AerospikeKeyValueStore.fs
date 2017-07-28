@@ -5,7 +5,7 @@ open Sunergeo.Core
 open Sunergeo.KeyValueStorage
 
 
-type AerospikeKeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStorageConfig) = 
+type AerospikeKeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStoreConfig) = 
 
     let innerStore = new AerospikeClient(config)
 

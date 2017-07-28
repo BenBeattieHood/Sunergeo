@@ -82,10 +82,14 @@ type MemoryLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>() =
                     |> Map.add transactionId newPartitionsAndItems
             )
 
-    member this.GetPartitionIds(): 'AggregateId seq =
+    member this.GetPositions(): ('AggregateId * int) seq =
         eventSource
         |> Map.toSeq
-        |> Seq.map fst
+        |> Seq.map 
+            (fun (aggregateId, items) ->
+                aggregateId,
+                (items |> Seq.head).Position
+            )
 
     member this.ReadFrom
         (aggregateId: 'AggregateId)
@@ -102,19 +106,15 @@ type MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion
 }
 
 type IEventSource<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> =
-    abstract member GetPartitionIds: unit -> 'AggregateId seq
+    abstract member GetPositions: unit -> ('AggregateId * int) seq
     abstract member ReadFrom: 'AggregateId -> int -> LogEntry<EventLogItem<'AggregateId, 'Init, 'Events>> seq option
 
 type MemoryEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion>) = 
-    let topic = 
-        config.InstanceId 
-        |> Utils.toTopic<'State>
-
     let memoryTopic = new MemoryLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>>()
     
     interface IEventSource<'AggregateId, 'Init, 'Events> with
-        member this.GetPartitionIds () =
-            memoryTopic.GetPartitionIds()
+        member this.GetPositions () =
+            memoryTopic.GetPositions()
 
         member this.ReadFrom aggregateId position =
             memoryTopic.ReadFrom aggregateId position
@@ -137,7 +137,7 @@ type MemoryEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyVa
             
                 try
                     for event in events do
-                        memoryTopic.Add(transactionId, aggregateId, event)
+                        memoryTopic.Add transactionId aggregateId event
                     
                     let position = events |> Seq.length |> int64
 

@@ -51,7 +51,7 @@
   <Import Project="$(FSharpTargetsPath)" />
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
-    <Compile Include="KeyValueStore.fs" />
+    <Compile Include="IKeyValueStore.fs" />
     <Content Include="packages.config" />
     <Compile Include="MemoryKeyValueStorage.fs" />
   </ItemGroup>

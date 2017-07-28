@@ -31,13 +31,13 @@ type KafkaPollingActor<'AggregateId, 'Init, 'State, 'Events when 'AggregateId : 
         let events:EventLogItem<'AggregateId, 'Init, 'Events> = Sunergeo.Core.Todo.todo()
         (aggregateId, events) |> onEvent
 
-    let topic = 
+    let shardId = 
         config.InstanceId 
-        |> Utils.toTopic<'State>
+        |> Utils.toShardId<'State>
 
     let consumerConfiguration =
         seq<string * obj> {
-            yield "group.id", upcast (topic + "-group")
+            yield "group.id", upcast (shardId + "-consumergroup")
 
             match config.AutoCommitIntervalMs with
             | Some autoCommitIntervalMs ->
@@ -57,16 +57,16 @@ type KafkaPollingActor<'AggregateId, 'Init, 'State, 'Events when 'AggregateId : 
 
     do consumer.OnMessage.Add 
         (fun message ->
-            if message.Topic = topic
+            if message.Topic = shardId
             then 
                 message |> onKafkaMessage
             else
-                sprintf "Received message for unexpected topic %s (listening on %s)" message.Topic topic
+                sprintf "Received message for unexpected topic %s (listening on %s)" message.Topic shardId
                 |> config.Logger LogLevel.Error
         )
             
     let self = this.Self
-    do consumer.Subscribe([ "tuneup" ]);
+    do consumer.Subscribe([ shardId ]);
     do this.Receive<unit>
         (fun _ -> 
             consumer.Poll(TimeSpan.FromSeconds 5.0)

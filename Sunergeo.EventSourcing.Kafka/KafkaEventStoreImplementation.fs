@@ -15,12 +15,12 @@ type KafkaEventStoreImplementationConfig<'AggregateId, 'Init, 'State, 'Events, '
 }
 
 type KafkaEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
-    let topic = 
+    let shardId = 
         config.InstanceId 
-        |> Utils.toTopic<'State>
+        |> Utils.toShardId<'State>
         
     let logConfig:KafkaLogConfig = {
-        Topic = topic
+        Topic = shardId
         Uri = config.LogUri
         Logger = config.Logger
     }

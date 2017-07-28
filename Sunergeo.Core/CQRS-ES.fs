@@ -39,10 +39,12 @@ type IQuery<'Id, 'ReadStore, 'Result when 'Id : comparison> =
     abstract Exec: Context -> 'ReadStore -> Result<'Result, Error>
 
 
+type ShardId = string
+
 module Utils =    
-    let toTopic<'State>
+    let toShardId<'State>
         (instanceId: InstanceId)
-        :string = 
+        :ShardId = 
         sprintf "%s-%s" 
             (typeof<'State>.Name)
             (instanceId |> string)

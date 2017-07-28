@@ -5,7 +5,7 @@ open System.IO
 open System.Runtime.Serialization.Json
 open System.Text
 
-type KeyValueStorageConfig = {
+type KeyValueStoreConfig = {
     Uri: Uri
     Logger: Sunergeo.Logging.Logger
     TableName: string

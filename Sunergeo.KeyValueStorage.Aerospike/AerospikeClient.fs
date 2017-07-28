@@ -12,9 +12,8 @@ type AerospikeWriteError =
     | InvalidVersion
     | Error of String
 
-
 // A TL;DR of write versions is here https://discuss.aerospike.com/t/locking-a-record-in-aerospike/2152/3
-type AerospikeClient(config: KeyValueStorageConfig) =
+type AerospikeClient(config: KeyValueStoreConfig) =
    
     let valueColumnName = "value"
     let db = "test"

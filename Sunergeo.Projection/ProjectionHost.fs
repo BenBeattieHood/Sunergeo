@@ -16,11 +16,11 @@ type ProjectionHostConfig<'ActorConfig, 'AggregateId, 'Init, 'Events, 'PollingAc
 
 [<AbstractClass>]
 type ProjectionHost<'ActorConfig, 'AggregateId, 'Init, 'State, 'Events, 'PollingActor when 'AggregateId : comparison>(config: ProjectionHostConfig<'ActorConfig, 'AggregateId, 'Init, 'Events, 'PollingActor>) as this = 
-    let topic = 
+    let shardId = 
         config.InstanceId 
-        |> Utils.toTopic<'State>
+        |> Utils.toShardId<'State>
 
-    let actorSystem = ActorSystem.Create topic
+    let actorSystem = ActorSystem.Create shardId
 
     let mutable actors:Map<'AggregateId, Akka.Actor.IActorRef> = Map.empty
     let createOrLoadActor 

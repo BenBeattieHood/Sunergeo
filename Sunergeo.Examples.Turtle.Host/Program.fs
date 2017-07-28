@@ -65,11 +65,11 @@ let main argv =
     sprintf "Starting server..."
     |> Console.WriteLine
 
-    //let snapshotStoreConfig:KeyValueStorageConfig = 
+    //let snapshotStoreConfig:KeyValueStoreConfig = 
     //    {
     //        Uri = Uri("localhost:3000")
     //        Logger = logger
-    //        TableName = instanceId |> Utils.toTopic<Turtle>
+    //        TableName = instanceId |> Utils.toShardId<Turtle>
     //    }
 
     let snapshotStore = new MemoryKeyValueStore<TurtleId, Snapshot<Turtle>>()
@@ -142,11 +142,11 @@ let main argv =
     |> Console.WriteLine
 
     
-    //let readStoreConfig:KeyValueStorageConfig = 
+    //let readStoreConfig:KeyValueStoreConfig = 
     //    {
     //        Uri = Uri("localhost:3000")
     //        Logger = logger
-    //        TableName = (instanceId |> Utils.toTopic<Turtle>) + "-ReadStore"
+    //        TableName = (instanceId |> Utils.toShardId<Turtle>) + "-ReadStore"
     //    }
 
     let readStore = MemoryKeyValueStore()

@@ -6,14 +6,13 @@ open Sunergeo.Logging
 open System
 open Akka.Actor
 
-type EventSourcePartitionId = int
-type EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = {
+type EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events, 'StateKeyValueVersion when 'AggregateId : comparison and 'StateKeyValueVersion : comparison> = {
     InstanceId: InstanceId
     Logger: Logger
     EventSource: Sunergeo.EventSourcing.Memory.IEventSource<'AggregateId, 'Init, 'Events>
-    GetProjectionId: EventSourcePartitionId -> 'AggregateId
+    PollStateStore: Sunergeo.KeyValueStorage.IKeyValueStore<string, 'AggregateId * int, 'StateKeyValueVersion>
 }
-type EventSourcePollingActor<'AggregateId, 'Init, 'State, 'Events when 'AggregateId : comparison>(config: EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events>, onEvent: ('AggregateId * EventLogItem<'AggregateId, 'Init, 'Events>) -> unit) as this =
+type EventSourcePollingActor<'AggregateId, 'Init, 'State, 'Events, 'StateKeyValueVersion when 'AggregateId : comparison and 'StateKeyValueVersion : comparison>(config: EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events, 'StateKeyValueVersion>, onEvent: ('AggregateId * EventLogItem<'AggregateId, 'Init, 'Events>) -> unit) as this =
     inherit ReceiveActor()
 
     let kvp 
@@ -22,33 +21,21 @@ type EventSourcePollingActor<'AggregateId, 'Init, 'State, 'Events when 'Aggregat
         let key, value = keyAndValue
         System.Collections.Generic.KeyValuePair(key, value)
         
-    let onEventSourceMessage
-        (message: Confluent.EventSource.Message)
-        :unit =
+    let checkForEvents ():unit =
+        let positions = config.EventSource.GetPositions()
+        let pollState = topic |> config.PollStateStore.Get
         let aggregateId = message.Partition |> config.GetProjectionId
         let events:EventLogItem<'AggregateId, 'Init, 'Events> = Sunergeo.Core.Todo.todo()
         (aggregateId, events) |> onEvent
 
-    let topic = 
+    let shardId = 
         config.InstanceId 
-        |> Utils.toTopic<'State>
-        
-    let consumer = new Confluent.EventSource.Consumer(consumerConfiguration)
-
-    do consumer.OnMessage.Add 
-        (fun message ->
-            if message.Topic = topic
-            then 
-                message |> onEventSourceMessage
-            else
-                sprintf "Received message for unexpected topic %s (listening on %s)" message.Topic topic
-                |> config.Logger LogLevel.Error
-        )
+        |> Utils.toShardId<'State>
             
     let self = this.Self
     do this.Receive<unit>
         (fun message -> 
-            consumer.Poll(TimeSpan.FromSeconds 5.0)
+            checkForEvents()
             self.Tell(message)
         )
 
