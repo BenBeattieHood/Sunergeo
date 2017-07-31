@@ -77,6 +77,11 @@
       <Project>{bca1c940-bd2e-4822-951e-16941f87de95}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.KeyValueStorage\Sunergeo.KeyValueStorage.fsproj">
+      <Name>Sunergeo.KeyValueStorage</Name>
+      <Project>{1f5a780b-974c-4e53-b513-06c73770db0f}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Sunergeo.Web\Sunergeo.Web.fsproj">
       <Name>Sunergeo.Web</Name>
       <Project>{6bda4a6f-5831-4f1b-adbb-551f2ac0bb28}</Project>

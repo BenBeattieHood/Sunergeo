@@ -39,11 +39,14 @@ module KeyValueStoreModule =
         let obj = (new DataContractJsonSerializer(typeof<'a>)).ReadObject(ms) 
         obj :?> 'a
 
-
-type IKeyValueStore<'Key, 'Value, 'Version when 'Version : comparison> = 
+        
+type IReadOnlyKeyValueStore<'Key, 'Value, 'Version when 'Version : comparison> = 
 
     abstract member Get: 'Key -> Result<('Value * 'Version) option, ReadError>
-    
+
+type IKeyValueStore<'Key, 'Value, 'Version when 'Version : comparison> = 
+    inherit IReadOnlyKeyValueStore<'Key, 'Value, 'Version>
+
     abstract member Create: 'Key -> 'Value -> Result<unit, WriteError>
     
     abstract member Delete: 'Key -> 'Version -> Result<unit, WriteError>

@@ -34,9 +34,8 @@ type IUpdateCommand<'Id, 'State, 'Events when 'Id : comparison> =
     
 
 
-type IQuery<'Id, 'ReadStore, 'Result when 'Id : comparison> =
-    abstract GetId: Context -> 'Id
-    abstract Exec: Context -> 'ReadStore -> Result<'Result, Error>
+type IQuery<'ReadStore, 'Result> =
+    abstract Exec: Context -> 'ReadStore -> Async<Result<'Result, Error>>
 
 
 type ShardId = string

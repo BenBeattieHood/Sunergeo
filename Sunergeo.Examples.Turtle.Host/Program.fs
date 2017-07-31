@@ -25,6 +25,7 @@ open Sunergeo.Examples.Turtle.Events
 open Sunergeo.Examples.Turtle.State
 open Sunergeo.Examples.Turtle.Aggregate
 open Sunergeo.Examples.Turtle.Commands
+open Sunergeo.Examples.Turtle.Queries
 open Microsoft.AspNetCore.Http
 
 let execCreateCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> ICreateCommand<'AggregateId, 'State, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
@@ -50,6 +51,17 @@ let execCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVers
         (command.GetId context)
         command.Exec
     |> Async.RunSynchronously
+
+let execQueryFor<'Query, 'KeyValueVersion when 'Query :> IQuery<'AggregateId, 'State, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
+    (eventStore: Sunergeo.EventSourcing.EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>)
+    (command: IUpdateCommand<'AggregateId, 'State, 'Events>)
+    (context: Context)
+    (request: HttpRequest)
+    : Result<unit, Error> =
+    eventStore.Append
+        context
+        (command.GetId context)
+        command.Exec
 
 [<EntryPoint>]
 let main argv = 
@@ -163,7 +175,7 @@ let main argv =
             )
         SetPollPositionState = 
             (fun x ->
-                async { pollPositionState <- x}
+                async { pollPositionState <- x }
             )
     }
         //KafkaPollingActorConfig = 
@@ -199,6 +211,11 @@ let main argv =
             Logger = logger
             Handlers = 
                 [
+                    {
+                        RoutedQuery.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<GetTurtle<_>>).Value.PathAndQuery
+                        RoutedQuery.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<GetTurtle<_>>).Value.HttpMethod
+                        RoutedQuery.Exec = execCreateCommand
+                    } |> Routing.createHandler
                 ]
             BaseUri = Uri("http://localhost:8081")
         }
