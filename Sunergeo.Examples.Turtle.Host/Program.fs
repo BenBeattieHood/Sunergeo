@@ -152,11 +152,32 @@ let main argv =
     let readStore = MemoryKeyValueStore()
 
     use akkaSignalr = Sunergeo.AkkaSignalr.Consumer.Program.StartAkkaAndSignalr()
+    
+    let mutable pollPositionState:Map<TurtleId, int> = Map.empty
+    let pollingActorConfig:Sunergeo.Projection.EventSourcePollingActorConfig<TurtleId, Turtle, TurtleEvent, MemoryKeyValueVersion> = {
+        Logger = logger
+        EventSource = eventStoreImplementation :> Sunergeo.EventSourcing.Memory.IEventSource<TurtleId, Turtle, TurtleEvent>
+        GetPollPositionState =
+            (fun _ ->
+                async { return pollPositionState }
+            )
+        SetPollPositionState = 
+            (fun x ->
+                async { pollPositionState <- x}
+            )
+    }
+        //KafkaPollingActorConfig = 
+        //    {
+        //        KafkaUri = eventSourceConfig.LogUri
+        //        GroupId = "tuneup"
+        //        AutoCommitIntervalMs = 5000 |> Some
+        //        StatisticsIntervalMs = 60000
+        //        Servers = "localhost:9092"
+        //    }
         
-    let kafkaProjectionHostConfig:ProjectionHostConfig<KeyValueStorageProjectionConfig<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>, TurtleId> = {
+    let projectionHostConfig:ProjectionHostConfig<KeyValueStorageProjectionConfig<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>, TurtleId, Turtle, TurtleEvent, EventSourcePollingActor<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>> = {
         Logger = logger
         InstanceId = instanceId
-        KafkaUri = eventSourceConfig.LogUri
         ActorConfig = 
             {
                 Logger = logger
@@ -164,17 +185,13 @@ let main argv =
                 CreateState = DefaultReadStore.create
                 FoldState = DefaultReadStore.fold
             }
-        KafkaPollingActorConfig = 
-            {
-                GroupId = "tuneup"
-                AutoCommitIntervalMs = 5000 |> Some
-                StatisticsIntervalMs = 60000
-                Servers = "localhost:9092"
-            }
-        GetPartitionId = string
+        CreatePollingActor = 
+            (fun instanceId onEvent ->
+                EventSourcePollingActor(pollingActorConfig, instanceId, onEvent)
+            )
     }
 
-    use kafkaProjectionHost = new KeyValueStoreProjectorHost<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>(kafkaProjectionHostConfig)
+    use projectionHost = new KeyValueStoreProjectorHost<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion, EventSourcePollingActor<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>>(projectionHostConfig)
         
 
     let queryWebHostConfig:QueryWebHostConfig = 

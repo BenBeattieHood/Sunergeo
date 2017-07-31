@@ -81,6 +81,6 @@ type KeyValueStoreProjector<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersi
             |> processWithState
 
 
-type KeyValueStoreProjectorHost<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: Sunergeo.Projection.ProjectionHostConfig<KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'AggregateId>) =
-    inherit Sunergeo.Projection.ProjectionHost<KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'AggregateId, 'Init, 'State, 'Events>(config)
+type KeyValueStoreProjectorHost<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion, 'PollingActor when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: Sunergeo.Projection.ProjectionHostConfig<KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'AggregateId, 'Init, 'Events, 'PollingActor>) =
+    inherit Sunergeo.Projection.ProjectionHost<KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'AggregateId, 'Init, 'State, 'Events, 'PollingActor>(config)
     override this.CreateActor config aggregateId = upcast new KeyValueStoreProjector<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>(config, aggregateId)

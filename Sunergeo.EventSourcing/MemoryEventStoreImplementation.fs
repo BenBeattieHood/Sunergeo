@@ -82,12 +82,10 @@ type MemoryLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>() =
                     |> Map.add transactionId newPartitionsAndItems
             )
 
-    member this.GetPositions(): ('AggregateId * int) seq =
+    member this.GetPositions(): Map<'AggregateId, int> =
         eventSource
-        |> Map.toSeq
-        |> Seq.map 
-            (fun (aggregateId, items) ->
-                aggregateId,
+        |> Map.map
+            (fun aggregateId items ->
                 (items |> Seq.head).Position
             )
 
@@ -102,22 +100,22 @@ type MemoryLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>() =
 type MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
-    SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
+    SnapshotStore: IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
 }
 
 type IEventSource<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> =
-    abstract member GetPositions: unit -> ('AggregateId * int) seq
-    abstract member ReadFrom: 'AggregateId -> int -> LogEntry<EventLogItem<'AggregateId, 'Init, 'Events>> seq option
+    abstract member GetPositions: unit -> Async<Map<'AggregateId, int>>
+    abstract member ReadFrom: 'AggregateId -> int -> Async<LogEntry<EventLogItem<'AggregateId, 'Init, 'Events>> seq option>
 
 type MemoryEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion>) = 
     let memoryTopic = new MemoryLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>>()
     
     interface IEventSource<'AggregateId, 'Init, 'Events> with
         member this.GetPositions () =
-            memoryTopic.GetPositions()
+            async { return memoryTopic.GetPositions() }
 
         member this.ReadFrom aggregateId position =
-            memoryTopic.ReadFrom aggregateId position
+            async { return memoryTopic.ReadFrom aggregateId position }
 
     interface IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion> with
 

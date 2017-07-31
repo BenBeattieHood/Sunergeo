@@ -7,36 +7,76 @@ open System
 open Akka.Actor
 
 type EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events, 'StateKeyValueVersion when 'AggregateId : comparison and 'StateKeyValueVersion : comparison> = {
-    InstanceId: InstanceId
     Logger: Logger
     EventSource: Sunergeo.EventSourcing.Memory.IEventSource<'AggregateId, 'Init, 'Events>
-    PollStateStore: Sunergeo.KeyValueStorage.IKeyValueStore<string, 'AggregateId * int, 'StateKeyValueVersion>
+    GetPollPositionState: unit -> Async<Map<'AggregateId, int>>
+    SetPollPositionState: Map<'AggregateId, int> -> Async<unit>
 }
-type EventSourcePollingActor<'AggregateId, 'Init, 'State, 'Events, 'StateKeyValueVersion when 'AggregateId : comparison and 'StateKeyValueVersion : comparison>(config: EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events, 'StateKeyValueVersion>, onEvent: ('AggregateId * EventLogItem<'AggregateId, 'Init, 'Events>) -> unit) as this =
+type EventSourcePollingActor<'AggregateId, 'Init, 'State, 'Events, 'StateKeyValueVersion when 'AggregateId : comparison and 'StateKeyValueVersion : comparison>(config: EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events, 'StateKeyValueVersion>, instanceId: InstanceId, onEvent: ('AggregateId * EventLogItem<'AggregateId, 'Init, 'Events>) -> unit) as this =
     inherit ReceiveActor()
 
-    let kvp 
-        (keyAndValue: 'a * 'b)
-        :System.Collections.Generic.KeyValuePair<'a, 'b> =
-        let key, value = keyAndValue
-        System.Collections.Generic.KeyValuePair(key, value)
-        
-    let checkForEvents ():unit =
-        let positions = config.EventSource.GetPositions()
-        let pollState = topic |> config.PollStateStore.Get
-        let aggregateId = message.Partition |> config.GetProjectionId
-        let events:EventLogItem<'AggregateId, 'Init, 'Events> = Sunergeo.Core.Todo.todo()
-        (aggregateId, events) |> onEvent
+    let tryFinally (body : Async<'T>) (finallyF : Async<unit>) = 
+        async {
+            let! ct = Async.CancellationToken
+            return! Async.FromContinuations(fun (sc,ec,cc) ->
+                let sc' (t : 'T) = Async.StartWithContinuations(finallyF, (fun () -> sc t), ec, cc, ct)
+                let ec' (e : exn) = Async.StartWithContinuations(finallyF, (fun () -> ec e), ec, cc, ct)
+                Async.StartWithContinuations(body, sc', ec', cc, ct))
+        }
+    
+    let getNewData () = 
+        async {
+            let! pollState = config.GetPollPositionState()
 
+            let! positions = 
+                config.EventSource.GetPositions()
+
+            let! results =
+                positions
+                |> Map.toSeq
+                |> Seq.choose
+                    (fun (aggregateId, positionId) ->
+                        match pollState |> Map.tryFind aggregateId with
+                        | Some processedPositionId when processedPositionId = positionId -> 
+                            None
+                        | Some processedPositionId ->
+                            Some (aggregateId, processedPositionId)
+                        | None ->
+                            Some (aggregateId, 0)
+                    )
+                |> Seq.map
+                    (fun (aggregateId, positionId) ->
+                        async {
+                            let! result = config.EventSource.ReadFrom aggregateId positionId
+                            return aggregateId, result
+                        }
+                    )
+                |> Async.Parallel
+
+            let results = results |> Array.choose (fun (aggregateId, logEntriesOption) -> logEntriesOption |> Option.map (fun logEntries -> aggregateId, logEntries))
+                
+            let mutable pollState = pollState
+
+            for (aggregateId, logEntries) in results do
+                for logEntry in logEntries do
+                    onEvent (aggregateId, logEntry.Item)
+
+                    pollState <-
+                        pollState
+                        |> Map.add aggregateId logEntry.Position
+
+                    do! config.SetPollPositionState pollState
+        }
+        
     let shardId = 
-        config.InstanceId 
+        instanceId 
         |> Utils.toShardId<'State>
             
     let self = this.Self
     do this.Receive<unit>
-        (fun message -> 
-            checkForEvents()
-            self.Tell(message)
+        (fun _ -> 
+            getNewData() |> Async.RunSynchronously
+            self.Tell(())
         )
 
     override this.PreStart() =
