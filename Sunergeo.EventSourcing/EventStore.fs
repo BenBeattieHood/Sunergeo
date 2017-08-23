@@ -5,14 +5,14 @@ open Sunergeo.Core
 open Sunergeo.EventSourcing.Storage
 
 
-type EventStoreConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
+type EventStoreConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     Fold: 'State -> 'Events -> 'State
     Logger: Sunergeo.Logging.Logger
     CreateInit: 'AggregateId -> Context -> 'State -> 'Init
-    Implementation: IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>
+    Implementation: IEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>
 }
 
-type EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
+type EventStore<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
     
     member this.Create(context: Context) (aggregateId: 'AggregateId) (f: CreateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
         let apply
@@ -28,11 +28,11 @@ type EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Agg
                         EventSourceInitItem.CreatedOn = context.Timestamp
                         EventSourceInitItem.Init = config.CreateInit aggregateId context newState
                     }
-                    |> EventLogItem.Init
+                    |> EventLogItemData.Init
 
                 yield!
                     newEvents 
-                    |> Seq.map EventLogItem.Event
+                    |> Seq.map EventLogItemData.Event
             }
 
             newState, newEvents, None
@@ -60,7 +60,7 @@ type EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Agg
                 newEvents
                 |> Seq.fold config.Fold snapshot.State
 
-            newState, (newEvents |> Seq.map EventLogItem.Event), (version |> Some)
+            newState, (newEvents |> Seq.map EventLogItemData.Event), (version |> Some)
 
         config.Implementation.Append aggregateId
             (fun snapshotAndVersion ->
@@ -74,3 +74,28 @@ type EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Agg
                     f context snapshot.State 
                     |> ResultModule.map (fun newEvents -> apply snapshot newEvents version)
             )
+
+    //member this.Delete(context: Context) (aggregateId: 'AggregateId) (f: DeleteCommandExec<'State>): Async<Result<unit, Error>> =
+    //    let apply
+    //        (snapshot: Snapshot<'State>)
+    //        =
+    //        let newEvents = seq {
+    //            yield 
+    //                context.Timestamp
+    //                |> EventLogItem.End
+    //        }
+
+    //        newState, newEvents, None
+
+    //    config.Implementation.Append aggregateId
+    //        (fun snapshotAndVersion ->
+    //            match snapshotAndVersion with
+    //            | None -> 
+    //                "State, found None"
+    //                |> Error.InvalidOp
+    //                |> Result.Error
+                    
+    //            | Some (snapshot, version) ->
+    //                f context snapshot.State 
+    //                |> ResultModule.map (fun _ -> apply snapshot)
+    //        )

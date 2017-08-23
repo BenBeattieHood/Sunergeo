@@ -54,6 +54,7 @@ type KafkaPollingActor<'AggregateId, 'Init, 'State, 'Events when 'AggregateId : 
         |> Seq.map kvp
         
     let consumer = new Confluent.Kafka.Consumer(consumerConfiguration)
+    consumer.Assign(Confluent.Kafka.off
 
     do consumer.OnMessage.Add 
         (fun message ->

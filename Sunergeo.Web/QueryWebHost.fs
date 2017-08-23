@@ -6,11 +6,6 @@ open Sunergeo.Web
 
 open Routing
 
-//type LogConfig = {
-//    LogName: string
-//}
-
-
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Hosting
 open Microsoft.AspNetCore.Builder
@@ -50,21 +45,20 @@ type QueryWebHostStartup (config: QueryWebHostStartupConfig) =
                             handler context ctx.Request
                         )
                        
-                WebHost.runHandlerAndOutputToResponse 
-                    queryHandler
-                    (fun result ->
-                        if result = null
-                        then
-                            null, StatusCodes.Status204NoContent
-                        else
-                            result, StatusCodes.Status200OK
-                        |> Some
-                    )
-                    (fun logLevel message -> 
-                        config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
-                    )
-                    ctx.Response
-
+                do! WebHost.runHandler
+                        queryHandler
+                        (fun result ->
+                            if result = null
+                            then
+                                null, StatusCodes.Status204NoContent
+                            else
+                                result, StatusCodes.Status200OK
+                            |> Some
+                        )
+                        (fun logLevel message -> 
+                            config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
+                        )
+                        ctx.Response
 
             } |> Async.StartAsTask :> Task
 

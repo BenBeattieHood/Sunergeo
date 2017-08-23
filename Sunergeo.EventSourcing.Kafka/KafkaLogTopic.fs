@@ -5,19 +5,37 @@ open Sunergeo.EventSourcing.Storage
 open System
 open System.Text
 open Sunergeo.Core
-open Kafunk
-open Newtonsoft.Json
+open Sunergeo.Kafka
+open ResultModule
 
 type LogEntry<'Item> = {
     Position: int   // in Kafka this is called the offset, and it is available after the item has been written to a partition
     Item: 'Item
 }
 
-type KafkaLogConfig = {
-    Uri: Uri
+type KafkaLogConfig<'AggregateId, 'Item when 'AggregateId : comparison> = {
+    ProducerConfig: Sunergeo.Kafka.KafkaProducerConfig
     Topic: string
     Logger: Sunergeo.Logging.Logger
+    SerializeAggregateId: 'AggregateId -> byte[]
+    SerializeItem: 'Item -> byte[]
 }
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module KafkaLogConfig =
+    let createDefaultProducerConfig
+        (clientId: string)
+        (hosts: Sunergeo.Kafka.KafkaHost list)
+        :Sunergeo.Kafka.KafkaProducerConfig =
+        {
+            Sunergeo.Kafka.KafkaProducerConfig.Default with
+                BootstrapHosts = hosts
+                ClientId = clientId
+                Partitioner = null
+                EnableIdempotence = true    // custom (default false)
+                InflightRequestsPerConnectionMax = 1    // custom (default 5)
+                TransactionalId = clientId
+        }
+
 
 type LogError =
     Timeout
@@ -25,69 +43,42 @@ type LogError =
 
 type LogTransactionId = string
 
-type KafkaLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>(config: KafkaLogConfig) =
-    let toAsync (a:'a): Async<'a> = async { return a }
+type KafkaLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>(config: KafkaLogConfig<'AggregateId, 'Item>) =
 
-    let kafkaConnection = Kafka.connHost (sprintf "%s:%i" config.Uri.Host config.Uri.Port)
-    let producerMap : Map<'AggregateId, Producer> = Map.empty
+    let producer = new Confluent.Kafka.Producer(config.ProducerConfig |> Sunergeo.Kafka.KafkaProducerConfig.toKafkaConfig)
         
-    let createProducer (aggregateId: 'AggregateId) =
-        let producerCfg =
-              ProducerConfig.create (
-                topic = config.Topic, 
-                partition = Partitioner.konst (hash aggregateId), 
-                requiredAcks = RequiredAcks.Local)
-
-        let producer =
-            Producer.createAsync kafkaConnection producerCfg
-            |> Async.RunSynchronously
-
-        producer
-
     member this.BeginTransaction(): Async<LogTransactionId> =
         // see https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/
         async {
-            return ("" : LogTransactionId)
+            return Sunergeo.Core.Todo.todo()
         }
 
     member this.AbortTransaction(): Async<unit> =
         // see https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/
         async {
-            return Sunergeo.Core.NotImplemented.NotImplemented()
+            return Sunergeo.Core.Todo.todo()
         }
 
     member this.CommitTransaction(): Async<unit> =
         // see https://www.confluent.io/blog/exactly-once-semantics-are-possible-heres-how-apache-kafka-does-it/
         async {
-            return Sunergeo.Core.NotImplemented.NotImplemented()
+            return Sunergeo.Core.Todo.todo()
         }
 
-    member this.Add(aggregateId: 'AggregateId, item: 'Item): Async<Result<int64, LogError>> =
+    member this.Add(aggregateId: 'AggregateId, item: 'Item): Async<Result<ShardPartition * ShardPartitionOffset, LogError>> =
         async {
-            let producer = 
-                lock producerMap
-                    (fun _ ->
-                        producerMap
-                        |> Map.tryFind aggregateId
-                        |> Option.defaultWith
-                            (fun _ -> 
-                                let producer = 
-                                    aggregateId 
-                                    |> createProducer
-
-                                producerMap.Add(aggregateId, producer) 
-                                |> ignore
-
-                                producer
-                            )           
+            let serializedAggregateId = aggregateId |> config.SerializeAggregateId
+            let serializedItem = item |> config.SerializeItem
+            
+            let! result =
+                producer.ProduceAsync(
+                    config.Topic,
+                    serializedAggregateId,
+                    serializedItem
                     )
+                |> Async.AwaitTask
 
-            let jsonSerializer = JsonConvert.SerializeObject >> Encoding.ASCII.GetBytes
-            let serializedItem = jsonSerializer item
-            let producerMessage = ProducerMessage.ofBytes(serializedItem)
-
-            let! result = Producer.produce producer producerMessage
-            return (int64)result.offset |> Result.Ok
+            return (result.TopicPartition |> TopicPartition.toShardPartition, result.Offset.Value) |> Result.Ok
         }
 
     //member this.ReadFrom(aggregateId: 'AggregateId, positionId: int64): Async<Result<LogEntry<'Item> seq, LogError>> =
@@ -140,4 +131,4 @@ type KafkaLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>(config: K
  
     interface System.IDisposable with
         member this.Dispose() =
-            kafkaConnection.Close()
+            producer.Dispose()

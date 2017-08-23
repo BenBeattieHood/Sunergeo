@@ -103,31 +103,31 @@ type MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion
     SnapshotStore: IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
 }
 
-type IEventSource<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> =
+type IEventSource<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : comparison> =
     abstract member GetPositions: unit -> Async<Map<'AggregateId, int>>
-    abstract member ReadFrom: 'AggregateId -> int -> Async<LogEntry<EventLogItem<'AggregateId, 'Init, 'Events>> seq option>
+    abstract member ReadFrom: 'AggregateId -> int -> Async<LogEntry<EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>> seq option>
 
-type MemoryEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion>) = 
-    let memoryTopic = new MemoryLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>>()
+type MemoryEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion>) = 
+    let memoryTopic = new MemoryLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>>()
     
-    interface IEventSource<'AggregateId, 'Init, 'Events> with
+    interface IEventSource<'AggregateId, 'Metadata, 'Init, 'Events> with
         member this.GetPositions () =
             async { return memoryTopic.GetPositions() }
 
         member this.ReadFrom aggregateId position =
             async { return memoryTopic.ReadFrom aggregateId position }
 
-    interface IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion> with
+    interface IEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion> with
 
         member this.Append aggregateId getNewStateAndEvents =
             async {
                 let snapshotAndVersion = 
                     aggregateId 
                     |> config.SnapshotStore.Get 
+                    |> ResultModule.get 
 
                 let (newState, events, version) = 
                     snapshotAndVersion 
-                    |> ResultModule.get 
                     |> getNewStateAndEvents
                     |> ResultModule.get
             

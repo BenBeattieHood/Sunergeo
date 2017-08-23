@@ -6,54 +6,77 @@ open Sunergeo.KeyValueStorage
 open Sunergeo.EventSourcing.Storage
 
 
-type KafkaEventStoreImplementationConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
+type KafkaEventStoreImplementationConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>
+    Implementation: IEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>
     SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
     LogUri: Uri
+    ProducerConfig: Sunergeo.Kafka.KafkaProducerConfig
+    SerializeAggregateId: 'AggregateId -> byte[]
+    SerializeItem: EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events> -> byte[]
 }
 
-type KafkaEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
+type KafkaEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
     let shardId = 
         config.InstanceId 
         |> Utils.toShardId<'State>
         
-    let logConfig:KafkaLogConfig = {
-        Topic = shardId
-        Uri = config.LogUri
-        Logger = config.Logger
-    }
+    let logConfig:KafkaLogConfig<'AggregateId, EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>> = 
+        {
+            KafkaLogConfig.ProducerConfig = config.ProducerConfig
+            KafkaLogConfig.Topic = shardId
+            KafkaLogConfig.Logger = config.Logger
+            KafkaLogConfig.SerializeAggregateId = config.SerializeAggregateId
+            KafkaLogConfig.SerializeItem = config.SerializeItem
+        }
 
-    let kafkaTopic = new KafkaLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>>(logConfig)
+    let kafkaTopic = new KafkaLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>>(logConfig)
     
-    interface IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion> with
+    interface IEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion> with
 
         member this.Append aggregateId getNewStateAndEvents =
             async {
-                let snapshotAndVersion = 
-                    aggregateId 
-                    |> config.SnapshotStore.Get 
-
-                let (newState, events, version) = 
-                    snapshotAndVersion 
-                    |> ResultModule.get 
-                    |> getNewStateAndEvents
-                    |> ResultModule.get
-            
-                let! transactionId = kafkaTopic.BeginTransaction()
-            
                 try
-                    let mutable position = 0 |> int64
+                    let snapshotAndVersion = 
+                        aggregateId 
+                        |> config.SnapshotStore.Get 
+                        |> ResultModule.get 
+
+                    let (newState, events, version) = 
+                        snapshotAndVersion 
+                        |> getNewStateAndEvents
+                        |> ResultModule.get
+            
+                    let! transactionId = kafkaTopic.BeginTransaction()
+
+                    let mutable shardPartition =
+                        snapshotAndVersion
+                        |> Option.map
+                            (fun (snapshot, version) ->
+                                snapshot.ShardPartition
+                            )
+            
+                    let mutable shardPartitionOffset = 0 |> int64
                 
                     for event in events do
-                        let! positionResult = kafkaTopic.Add(aggregateId, event)
-                        position <- (positionResult |> ResultModule.get)    
+                        let! shardPartitionAndOffsetResult = kafkaTopic.Add(aggregateId, event)
+                        let shardPartition', shardPartitionOffset' = shardPartitionAndOffsetResult |> ResultModule.get
+                        match shardPartition with
+                        | None ->
+                            shardPartition <- Some shardPartition'
+                        | Some x when x <> shardPartition' ->
+                            raise (ResultModule.ResultException(sprintf "Wrote to incorrect shard: %O instead of %O" shardPartition' x |> Sunergeo.KeyValueStorage.WriteError.Error))
+                        | _ ->
+                            ()
+                        shardPartitionOffset <- shardPartitionOffset'
                     
-                    let snapshot = {
-                        Snapshot.Position = position
-                        Snapshot.State = newState
-                    }
+                    let snapshot = 
+                        {
+                            Snapshot.ShardPartition = shardPartition.Value
+                            Snapshot.ShardPartitionOffset = shardPartitionOffset
+                            Snapshot.State = newState
+                        }
 
                     let snapshotPutResult =
                         match version with
@@ -96,7 +119,7 @@ type KafkaEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyVal
                                 |> Sunergeo.Core.Error.InvalidOp 
                                 |> Result.Error
 
-                    | :? _ as ex ->
+                    | _ as ex ->
                         do! kafkaTopic.AbortTransaction()
                         return Sunergeo.Core.NotImplemented.NotImplemented() //This needs transaction support
 

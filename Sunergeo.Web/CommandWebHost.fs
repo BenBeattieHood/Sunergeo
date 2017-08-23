@@ -6,16 +6,9 @@ open Sunergeo.Web
 
 open Routing
 
-//type LogConfig = {
-//    LogName: string
-//}
-
 type RoutedCommand<'Command, 'AggregateId when 'Command :> ICommandBase<'AggregateId> and 'AggregateId : comparison> =
     RoutedType<'Command, unit>
-
-//type RoutedCommand<'Command, 'AggregateId, 'State, 'Events when 'Command :> IUpdateCommand<'AggregateId, 'State, 'Events> and 'AggregateId : comparison> =
-//    RoutedType<'Command, UpdateCommandResult<'Events>>
-
+    
 type CommandHandler = RoutedTypeRequestHandler<unit>
 
 open System.Threading.Tasks
@@ -25,7 +18,6 @@ open Microsoft.AspNetCore.Http
 open Sunergeo.Logging
 open Microsoft.Extensions.DependencyInjection
 
-//, 'CreateCommand, 'UpdateCommand and 'CreateCommand :> ICreateCommand<'AggregateId, 'Events> and 'UpdateCommand :> IUpdateCommand<'AggregateId, 'State, 'Events>
 type CommandWebHostStartupConfig<'AggregateId, 'State, 'Events when 'AggregateId : comparison> = {
     Logger: Sunergeo.Logging.Logger
     ContextProvider: HttpContext -> Context
@@ -54,13 +46,13 @@ type CommandWebHostStartup<'AggregateId, 'State, 'Events when 'AggregateId : com
                             handler context ctx.Request
                         )
                         
-                WebHost.runHandlerAndOutputToResponse 
-                    commandHandler
-                    (fun _ -> None)
-                    (fun logLevel message -> 
-                        config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
-                    )
-                    ctx.Response
+                do! WebHost.runHandler
+                        commandHandler
+                        (fun _ -> None)
+                        (fun logLevel message -> 
+                            config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
+                        )
+                        ctx.Response
 
             } |> Async.StartAsTask :> Task
 

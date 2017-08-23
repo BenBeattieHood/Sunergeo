@@ -11,11 +11,11 @@ open Microsoft.AspNetCore.Http
 type RoutedType<'HandlerType, 'Result> = {
     PathAndQuery: string
     HttpMethod: HttpMethod
-    Exec: 'HandlerType -> Context -> HttpRequest -> Result<'Result, Error>
+    Exec: 'HandlerType -> Context -> HttpRequest -> Async<Result<'Result, Error>>
 }
 
 type RoutedTypeRequestHandler<'Result> = 
-    Context -> Microsoft.AspNetCore.Http.HttpRequest -> Option<unit -> Result<'Result, Error>>
+    Context -> Microsoft.AspNetCore.Http.HttpRequest -> Option<unit -> Async<Result<'Result, Error>>>
 
 
 let routePathAndQueryVariableRegex = Regex(@"\{(.+?)\}", RegexOptions.Compiled)
@@ -50,13 +50,14 @@ let createUriPathOrQueryParamParser
         (fun s -> Sunergeo.Core.Todo.todo<obj>())
 
 
-let createHandler 
+let createHandler<'TargetType, 'Result>
     (routedType: RoutedType<'TargetType, 'Result>)
     :RoutedTypeRequestHandler<'Result> =
     let pathAndQueryRegexString = routedType.PathAndQuery |> routePathAndQueryToRegexString
     let pathAndQueryRegex = Regex(pathAndQueryRegexString, RegexOptions.Compiled)
 
-    let ctor = typeof<'TargetType>.GetConstructors().[0]      // assume a record type
+    let t = typeof<'TargetType>
+    let ctor = t.GetConstructors().[0]      // assume a record type
     let ctorParams = ctor.GetParameters()
 
     let regexGroupNames = 

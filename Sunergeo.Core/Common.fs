@@ -1,6 +1,7 @@
 ﻿namespace Sunergeo.Core
 
-type InstanceId = string
+type InstanceId = int
+type CorrelationId = Guid
 type UserId = string
 
 type Context = {

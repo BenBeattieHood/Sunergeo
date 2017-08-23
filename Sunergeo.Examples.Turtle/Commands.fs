@@ -103,3 +103,14 @@ type SetVisibilityCommand =
                 } |> TurtleEvent.VisibilitySet
             }
             |> Result.Ok
+
+//[<Route("/turtle/{TurtleId}/delete", HttpMethod.Post)>]
+//type DeleteCommand = 
+//    {
+//        TurtleId: TurtleId
+//    }
+//    interface IDeleteCommand<TurtleId, Turtle> with 
+//        member this.GetId context = this.TurtleId
+//        member this.Exec context _ =
+//            ()
+//            |> Result.Ok
