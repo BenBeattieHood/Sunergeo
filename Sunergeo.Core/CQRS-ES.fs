@@ -56,6 +56,14 @@ type ShardPartition = {
     ShardPartitionId: ShardPartitionId
 }
 
+
+type Snapshot<'State> = {
+    ShardPartition: ShardPartition
+    ShardPartitionPosition: ShardPartitionPosition
+    State: 'State
+}
+
+
 module Utils =    
     let toShardId<'State>
         (instanceId: InstanceId)

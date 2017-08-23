@@ -4,7 +4,6 @@ open Sunergeo.Core
 open Sunergeo.Projection
 open Sunergeo.Logging
 open Sunergeo.KeyValueStorage
-open Sunergeo.EventSourcing.Storage
 
 open System
 
@@ -28,23 +27,43 @@ type KeyValueProjector<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion wh
                     
                 match snapshotAndVersion, item.Data with
                 | None, EventLogItemData.Event event ->
-                    sprintf "No state exists" |> WriteError.Error |> Result.Error
+                    sprintf "No snapshot exists" |> WriteError.Error |> Result.Error
 
-                | Some (state, version), EventLogItemData.Init init ->
-                    sprintf "State already exists" |> WriteError.Error |> Result.Error
+                | Some (snapshot, version), EventLogItemData.Init init ->
+                    if snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition <= shardPartitionPosition
+                    then
+                        // replaying partition, but this is already projected
+                        () |> Result.Ok
+                    else
+                        sprintf "Snapshot already exists" |> WriteError.Error |> Result.Error
 
                 | None, EventLogItemData.Init init ->
                     let newState = config.CreateState aggregateId init
                     config.KeyValueStore.Create
                         aggregateId
-                        newState
+                        {
+                            Snapshot.ShardPartition = shardPartition 
+                            Snapshot.ShardPartitionPosition = shardPartitionPosition
+                            Snapshot.State = newState
+                        }
 
-                | Some (state, version), EventLogItemData.Event event ->
-                    if state.
-                    let newState = config.Fold state event
-                    config.KeyValueStore.Put
-                        aggregateId
-                        (newState, version)
+                | Some (snapshot, version), EventLogItemData.Event event ->
+                    if snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition <= shardPartitionPosition
+                    then
+                        // replaying partition, but this is already projected
+                        () |> Result.Ok
+                    else
+                        let newState = config.Fold snapshot.State event
+                        config.KeyValueStore.Put
+                            aggregateId
+                            (
+                                {
+                                    Snapshot.ShardPartition = shardPartition 
+                                    Snapshot.ShardPartitionPosition = shardPartitionPosition
+                                    Snapshot.State = newState
+                                }, 
+                                version
+                            )
 
                 |> ResultModule.get
 

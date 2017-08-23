@@ -4,12 +4,6 @@ open System
 open System.Text
 open Sunergeo.Core
 
-type Snapshot<'State> = {
-    ShardPartition: ShardPartition
-    ShardPartitionPosition: ShardPartitionPosition
-    State: 'State
-}
-
 type LogError =
     Timeout
     | Error of string
