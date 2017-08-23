@@ -98,7 +98,7 @@ type MemoryLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>() =
         |> Map.tryFind aggregateId
 
 type MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
-    InstanceId: InstanceId
+    ShardId: ShardId
     Logger: Sunergeo.Logging.Logger
     SnapshotStore: IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
 }
@@ -137,10 +137,15 @@ type MemoryEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Eve
                     for event in events do
                         memoryTopic.Add transactionId aggregateId event
                     
-                    let position = events |> Seq.length |> int64
+                    let shardPartitionOffset = events |> Seq.length |> int64
 
                     let snapshot = {
-                        Snapshot.Position = position
+                        Snapshot.ShardPartition = 
+                            {
+                                ShardPartition.ShardId = config.ShardId
+                                ShardPartition.ShardPartitionId = 0
+                            }
+                        Snapshot.ShardPartitionOffset = shardPartitionOffset
                         Snapshot.State = newState
                     }
 

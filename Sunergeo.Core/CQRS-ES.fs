@@ -2,27 +2,20 @@
 
 type IEvent = interface end
 
-
-type EventSourceInitItem<'AggregateId, 'Init when 'AggregateId : comparison> = 
-    {
-        Id: 'AggregateId
-        CreatedOn: NodaTime.Instant
-        Init: 'Init
-    }
-    interface IEvent
-
 type EventLogItemData<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = 
-    Init of EventSourceInitItem<'AggregateId, 'Init>
+    Init of 'Init
     | Event of 'Events
     //| End of NodaTime.Instant
     
-type EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : comparison> = {
+type EventLogItemMetadata<'AggregateId when 'AggregateId : comparison> = {
     InstanceId: InstanceId
-    Id: 'AggregateId
+    AggregateId: 'AggregateId
     CorrelationId: CorrelationId
     FromCorrelationId: CorrelationId option
-    CreatedAt: NodaTime.Instant
-    Metadata: 'Metadata
+    Timestamp: NodaTime.Instant
+}
+type EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : comparison> = {
+    Metadata: EventLogItemMetadata<'AggregateId>
     Data: EventLogItemData<'AggregateId, 'Init, 'Events>
 }
 
@@ -70,3 +63,8 @@ module Utils =
         sprintf "%s-%s" 
             (typeof<'State>.Name)
             (instanceId |> string)
+
+    let createCorrelationId
+        ()
+        :CorrelationId =
+        System.Guid.NewGuid().ToByteArray() |> CorrelationId

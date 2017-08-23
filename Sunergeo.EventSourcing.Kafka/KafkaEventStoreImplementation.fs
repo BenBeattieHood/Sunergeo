@@ -7,7 +7,7 @@ open Sunergeo.EventSourcing.Storage
 
 
 type KafkaEventStoreImplementationConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
-    InstanceId: InstanceId
+    ShardId: ShardId
     Logger: Sunergeo.Logging.Logger
     Implementation: IEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>
     SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
@@ -18,14 +18,11 @@ type KafkaEventStoreImplementationConfig<'AggregateId, 'Metadata, 'Init, 'State,
 }
 
 type KafkaEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
-    let shardId = 
-        config.InstanceId 
-        |> Utils.toShardId<'State>
-        
+  
     let logConfig:KafkaLogConfig<'AggregateId, EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>> = 
         {
             KafkaLogConfig.ProducerConfig = config.ProducerConfig
-            KafkaLogConfig.Topic = shardId
+            KafkaLogConfig.Topic = config.ShardId
             KafkaLogConfig.Logger = config.Logger
             KafkaLogConfig.SerializeAggregateId = config.SerializeAggregateId
             KafkaLogConfig.SerializeItem = config.SerializeItem

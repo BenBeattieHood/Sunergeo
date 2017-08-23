@@ -14,6 +14,23 @@ type EventStoreConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValue
 
 type EventStore<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
     
+    let toEventLogItem
+        (context: Context)
+        (aggregateId: 'AggregateId)
+        (data: EventLogItemData<_, _, _>)
+        =
+        {
+            EventLogItem.Metadata = 
+                {
+                    EventLogItemMetadata.InstanceId = context.InstanceId
+                    EventLogItemMetadata.AggregateId = aggregateId
+                    EventLogItemMetadata.CorrelationId = Utils.createCorrelationId()
+                    EventLogItemMetadata.FromCorrelationId = context.FromCorrelationId
+                    EventLogItemMetadata.Timestamp = NodaTime.Instant()
+                }
+            EventLogItem.Data = data
+        }
+
     member this.Create(context: Context) (aggregateId: 'AggregateId) (f: CreateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
         let apply
             (
@@ -21,19 +38,17 @@ type EventStore<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersio
                 (newEvents: 'Events seq)
             )
             =
-            let newEvents = seq {
-                yield 
-                    {
-                        EventSourceInitItem.Id = aggregateId
-                        EventSourceInitItem.CreatedOn = context.Timestamp
-                        EventSourceInitItem.Init = config.CreateInit aggregateId context newState
-                    }
-                    |> EventLogItemData.Init
+            let newEvents = 
+                seq {
+                    yield
+                        config.CreateInit aggregateId context newState
+                        |> EventLogItemData.Init
 
-                yield!
-                    newEvents 
-                    |> Seq.map EventLogItemData.Event
-            }
+                    yield!
+                        newEvents 
+                        |> Seq.map EventLogItemData.Event
+                }
+                |> Seq.map (toEventLogItem context aggregateId)
 
             newState, newEvents, None
 
@@ -60,7 +75,7 @@ type EventStore<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersio
                 newEvents
                 |> Seq.fold config.Fold snapshot.State
 
-            newState, (newEvents |> Seq.map EventLogItemData.Event), (version |> Some)
+            newState, (newEvents |> Seq.map EventLogItemData.Event |> Seq.map (toEventLogItem context aggregateId)), (version |> Some)
 
         config.Implementation.Append aggregateId
             (fun snapshotAndVersion ->

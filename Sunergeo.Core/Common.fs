@@ -1,12 +1,14 @@
 ﻿namespace Sunergeo.Core
 
 type InstanceId = int
-type CorrelationId = Guid
+type CorrelationId = System.Guid
 type UserId = string
 
 type Context = {
+    InstanceId: InstanceId
     UserId: UserId
     WorkingAsUserId: UserId
+    FromCorrelationId: CorrelationId option
     Timestamp: NodaTime.Instant
 }
 
