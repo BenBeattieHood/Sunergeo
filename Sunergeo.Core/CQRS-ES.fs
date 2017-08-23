@@ -2,7 +2,7 @@
 
 type IEvent = interface end
 
-type EventLogItemData<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = 
+type EventLogItemData<'Init, 'Events> = 
     Init of 'Init
     | Event of 'Events
     //| End of NodaTime.Instant
@@ -14,9 +14,9 @@ type EventLogItemMetadata<'AggregateId when 'AggregateId : comparison> = {
     FromCorrelationId: CorrelationId option
     Timestamp: NodaTime.Instant
 }
-type EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : comparison> = {
+type EventLogItem<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = {
     Metadata: EventLogItemMetadata<'AggregateId>
-    Data: EventLogItemData<'AggregateId, 'Init, 'Events>
+    Data: EventLogItemData<'Init, 'Events>
 }
 
 
@@ -50,7 +50,7 @@ type IQuery<'ReadStore, 'Result> =
 
 type ShardId = string
 type ShardPartitionId = int
-type ShardPartitionOffset = int64
+type ShardPartitionPosition = int64
 type ShardPartition = {
     ShardId: ShardId
     ShardPartitionId: ShardPartitionId

@@ -6,20 +6,20 @@ open Sunergeo.KeyValueStorage
 open Sunergeo.EventSourcing.Storage
 
 
-type KafkaEventStoreImplementationConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
+type KafkaEventStoreImplementationConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     ShardId: ShardId
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>
+    Implementation: IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>
     SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
     LogUri: Uri
     ProducerConfig: Sunergeo.Kafka.KafkaProducerConfig
     SerializeAggregateId: 'AggregateId -> byte[]
-    SerializeItem: EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events> -> byte[]
+    SerializeItem: EventLogItem<'AggregateId, 'Init, 'Events> -> byte[]
 }
 
-type KafkaEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
+type KafkaEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: KafkaEventStoreImplementationConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
   
-    let logConfig:KafkaLogConfig<'AggregateId, EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>> = 
+    let logConfig:KafkaLogConfig<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>> = 
         {
             KafkaLogConfig.ProducerConfig = config.ProducerConfig
             KafkaLogConfig.Topic = config.ShardId
@@ -28,9 +28,9 @@ type KafkaEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Even
             KafkaLogConfig.SerializeItem = config.SerializeItem
         }
 
-    let kafkaTopic = new KafkaLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>>(logConfig)
+    let kafkaTopic = new KafkaLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>>(logConfig)
     
-    interface IEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion> with
+    interface IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion> with
 
         member this.Append aggregateId getNewStateAndEvents =
             async {
@@ -54,11 +54,11 @@ type KafkaEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Even
                                 snapshot.ShardPartition
                             )
             
-                    let mutable shardPartitionOffset = 0 |> int64
+                    let mutable shardPartitionPosition = 0 |> int64
                 
                     for event in events do
-                        let! shardPartitionAndOffsetResult = kafkaTopic.Add(aggregateId, event)
-                        let shardPartition', shardPartitionOffset' = shardPartitionAndOffsetResult |> ResultModule.get
+                        let! shardPartitionAndPositionResult = kafkaTopic.Add(aggregateId, event)
+                        let shardPartition', shardPartitionPosition' = shardPartitionAndPositionResult |> ResultModule.get
                         match shardPartition with
                         | None ->
                             shardPartition <- Some shardPartition'
@@ -66,12 +66,12 @@ type KafkaEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Even
                             raise (ResultModule.ResultException(sprintf "Wrote to incorrect shard: %O instead of %O" shardPartition' x |> Sunergeo.KeyValueStorage.WriteError.Error))
                         | _ ->
                             ()
-                        shardPartitionOffset <- shardPartitionOffset'
+                        shardPartitionPosition <- shardPartitionPosition'
                     
                     let snapshot = 
                         {
                             Snapshot.ShardPartition = shardPartition.Value
-                            Snapshot.ShardPartitionOffset = shardPartitionOffset
+                            Snapshot.ShardPartitionPosition = shardPartitionPosition
                             Snapshot.State = newState
                         }
 

@@ -8,11 +8,6 @@ open Sunergeo.Core
 open Sunergeo.Kafka
 open ResultModule
 
-type LogEntry<'Item> = {
-    Position: int   // in Kafka this is called the offset, and it is available after the item has been written to a partition
-    Item: 'Item
-}
-
 type KafkaLogConfig<'AggregateId, 'Item when 'AggregateId : comparison> = {
     ProducerConfig: Sunergeo.Kafka.KafkaProducerConfig
     Topic: string
@@ -65,7 +60,7 @@ type KafkaLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>(config: K
             return Sunergeo.Core.Todo.todo()
         }
 
-    member this.Add(aggregateId: 'AggregateId, item: 'Item): Async<Result<ShardPartition * ShardPartitionOffset, LogError>> =
+    member this.Add(aggregateId: 'AggregateId, item: 'Item): Async<Result<ShardPartition * ShardPartitionPosition, LogError>> =
         async {
             let serializedAggregateId = aggregateId |> config.SerializeAggregateId
             let serializedItem = item |> config.SerializeItem

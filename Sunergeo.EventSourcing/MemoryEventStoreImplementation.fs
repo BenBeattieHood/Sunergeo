@@ -7,6 +7,11 @@ open Sunergeo.Core
 open Sunergeo.KeyValueStorage
 open Sunergeo.EventSourcing.Storage
 
+type LogEntry<'Item> = {
+    Position: ShardPartitionPosition
+    Item: 'Item
+}
+
 type MemoryLogTransactionId = Guid
 
 type MemoryLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>() =
@@ -58,7 +63,7 @@ type MemoryLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>() =
                                         aggregateId 
                                         (
                                             partition 
-                                            |> Seq.append [ { Position = partitionLength + index; Item = item } ]
+                                            |> Seq.append [ { Position = partitionLength + index |> int64; Item = item } ]
                                         )
                     )
             )
@@ -82,7 +87,7 @@ type MemoryLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>() =
                     |> Map.add transactionId newPartitionsAndItems
             )
 
-    member this.GetPositions(): Map<'AggregateId, int> =
+    member this.GetPositions(): Map<'AggregateId, ShardPartitionPosition> =
         eventSource
         |> Map.map
             (fun aggregateId items ->
@@ -103,21 +108,21 @@ type MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion
     SnapshotStore: IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
 }
 
-type IEventSource<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : comparison> =
+type IEventSource<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> =
     abstract member GetPositions: unit -> Async<Map<'AggregateId, int>>
-    abstract member ReadFrom: 'AggregateId -> int -> Async<LogEntry<EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>> seq option>
+    abstract member ReadFrom: 'AggregateId -> int -> Async<LogEntry<EventLogItem<'AggregateId, 'Init, 'Events>> seq option>
 
-type MemoryEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion>) = 
-    let memoryTopic = new MemoryLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>>()
+type MemoryEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion>) = 
+    let memoryTopic = new MemoryLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>>()
     
-    interface IEventSource<'AggregateId, 'Metadata, 'Init, 'Events> with
+    interface IEventSource<'AggregateId, 'Init, 'Events> with
         member this.GetPositions () =
             async { return memoryTopic.GetPositions() }
 
         member this.ReadFrom aggregateId position =
             async { return memoryTopic.ReadFrom aggregateId position }
 
-    interface IEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion> with
+    interface IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion> with
 
         member this.Append aggregateId getNewStateAndEvents =
             async {
@@ -137,7 +142,7 @@ type MemoryEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Eve
                     for event in events do
                         memoryTopic.Add transactionId aggregateId event
                     
-                    let shardPartitionOffset = events |> Seq.length |> int64
+                    let shardPartitionPosition = events |> Seq.length |> int64
 
                     let snapshot = {
                         Snapshot.ShardPartition = 
@@ -145,7 +150,7 @@ type MemoryEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Eve
                                 ShardPartition.ShardId = config.ShardId
                                 ShardPartition.ShardPartitionId = 0
                             }
-                        Snapshot.ShardPartitionOffset = shardPartitionOffset
+                        Snapshot.ShardPartitionPosition = shardPartitionPosition
                         Snapshot.State = newState
                     }
 

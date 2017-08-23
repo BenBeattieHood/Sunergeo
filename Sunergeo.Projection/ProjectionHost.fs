@@ -26,13 +26,13 @@ module ProjectionUtils =
         |> stringJoin "-"
 
 
-type ProjectionHostConfig<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : comparison> = {
+type ProjectionHostConfig<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = {
     Logger: Logger
     ShardPartitionListeners: (unit -> unit) list
-    CommitEventSourceOffset: (ShardPartition * ShardPartitionOffset) -> unit
-    CreateProjector: unit -> (EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events> -> unit)
+    CommitEventSourcePosition: (ShardPartition * ShardPartitionPosition) -> unit
+    CreateProjector: unit -> (EventLogItem<'AggregateId, 'Init, 'Events> -> unit)
 }
-type ProjectionHost<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : comparison>(config: ProjectionHostConfig<'AggregateId, 'Metadata, 'Init, 'Events>) as this = 
+type ProjectionHost<'AggregateId, 'Init, 'Events when 'AggregateId : comparison>(config: ProjectionHostConfig<'AggregateId, 'Init, 'Events>) as this = 
     
     let createProjectionActor
         (actorSystem: Akka.Actor.ActorSystem)
@@ -40,7 +40,7 @@ type ProjectionHost<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : 
         : Akka.Actor.IActorRef =
         let projector = config.CreateProjector ()
         let projectionActorF =
-            (fun (mailbox: Actor<EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>>) ->
+            (fun (mailbox: Actor<EventLogItem<'AggregateId, 'Init, 'Events>>) ->
                 let rec loop _ =
                     actor {
                         let! message = mailbox.Receive()
@@ -82,7 +82,7 @@ type ProjectionHost<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : 
             )
 
     let actorSystemName =
-        config.ShardPartitionOffsets
+        config.ShardPartitionPositions
         |> List.map fst
         |> ProjectionUtils.getShardPartitionsName
         
@@ -92,10 +92,10 @@ type ProjectionHost<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : 
     let createOrLoadProjectionActor =
         createOrLoadProjectionActorWith (createProjectionActor actorSystem)
     let shardPartitionListeningActors =
-        config.ShardPartitionOffsets
+        config.ShardPartitionPositions
         |> List.map
-            (fun (shardPartition: ShardPartition, offset: ShardPartitionOffset) ->
-                let shardPartitionListener = config.CreateShardPartitionListener (shardPartition, offset)
+            (fun (shardPartition: ShardPartition, shardPartitionPosition: ShardPartitionPosition) ->
+                let shardPartitionListener = config.CreateShardPartitionListener (shardPartition, shardPartitionPosition)
                 let shardPartitionListeningActorF = 
                     (fun (mailbox: Actor<unit>) ->
                         let rec loop _ =
@@ -117,7 +117,7 @@ type ProjectionHost<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : 
     member this.OnEvent 
         (
             (aggregateId: 'AggregateId),
-            (event: EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>)
+            (event: EventLogItem<'AggregateId, 'Init, 'Events>)
         ):unit =
         let actor = aggregateId |> createOrLoadProjectionActor actorSystem
         actor <! event

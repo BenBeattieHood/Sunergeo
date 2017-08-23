@@ -5,19 +5,19 @@ open Sunergeo.Core
 open Sunergeo.EventSourcing.Storage
 
 
-type EventStoreConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
+type EventStoreConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     Fold: 'State -> 'Events -> 'State
     Logger: Sunergeo.Logging.Logger
     CreateInit: 'AggregateId -> Context -> 'State -> 'Init
-    Implementation: IEventStoreImplementation<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>
+    Implementation: IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>
 }
 
-type EventStore<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'AggregateId, 'Metadata, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
+type EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: EventStoreConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>) = 
     
     let toEventLogItem
         (context: Context)
         (aggregateId: 'AggregateId)
-        (data: EventLogItemData<_, _, _>)
+        (data: EventLogItemData<_, _>)
         =
         {
             EventLogItem.Metadata = 

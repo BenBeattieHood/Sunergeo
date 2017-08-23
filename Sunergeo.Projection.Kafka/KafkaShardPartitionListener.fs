@@ -7,43 +7,41 @@ open Sunergeo.Kafka
 
 open System
 
-type KafkaShardPartitionListenerConfig<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : comparison> = {
+type KafkaShardPartitionListenerConfig<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = {
     Logger: Logger
     ConsumerConfig: KafkaConsumerConfig
-    ShardPartitionOffsets: (ShardPartition * ShardPartitionOffset) list
-    OnItemReceived: EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events> -> unit
-    Deserialize: byte[] -> EventLogItem<'AggregateId, 'Metadata, 'Init, 'Events>
+    ShardPartitions: Map<ShardPartition, ShardPartitionPosition>
+    OnItemReceived: (EventLogItem<'AggregateId, 'Init, 'Events> -> unit) list
+    Deserialize: byte[] -> EventLogItem<'AggregateId, 'Init, 'Events>
 }
 
-type KafkaShardPartitionListener<'AggregateId, 'Metadata, 'Init, 'Events when 'AggregateId : comparison>(config: KafkaShardPartitionListenerConfig<'AggregateId, 'Metadata, 'Init, 'Events>) =
+type KafkaShardPartitionListener<'AggregateId, 'Init, 'Events when 'AggregateId : comparison>(config: KafkaShardPartitionListenerConfig<'AggregateId, 'Init, 'Events>) =
     
     let kafkaConsumer = new Confluent.Kafka.Consumer(config.ConsumerConfig |> KafkaConsumerConfig.toKafkaConfig)
-
-    let shardPartitions =
-        config.ShardPartitionOffsets
-        |> List.map fst
-        |> Set.ofList
-
+    
     do kafkaConsumer.OnMessage.Add
         (fun message ->
-            if (shardPartitions |> Set.contains ({ ShardPartition.ShardId = message.Topic; ShardPartition.ShardPartitionId = message.Partition }))
+            if (config.ShardPartitions |> Map.containsKey ({ ShardPartition.ShardId = message.Topic; ShardPartition.ShardPartitionId = message.Partition }))
             then
-                message.Value |> config.Deserialize |> config.OnItemReceived
+                let eventLogItem = message.Value |> config.Deserialize
+                for onItemReceived in config.OnItemReceived do
+                    eventLogItem |> onItemReceived
             else
-                sprintf "Received message for unexpected topic/partition %s:%i (listening on %s)" message.Topic message.Partition (shardPartitions |> ProjectionUtils.getShardPartitionsName)
+                sprintf "Received message for unexpected topic/partition %s:%i (listening on %s)" message.Topic message.Partition (config.ShardPartitions |> Map.toSeq |> Seq.map fst |> ProjectionUtils.getShardPartitionsName)
                 |> config.Logger LogLevel.Error
         )
 
-    let kafkaTopicPartitionOffsets =
-        config.ShardPartitionOffsets
+    let kafkaTopicPartitionPositions =
+        config.ShardPartitions
+        |> Map.toSeq
         |> Seq.map
-            (fun (shardPartition, shardPartitionOffset) ->
+            (fun (shardPartition, shardPartitionPosition) ->
                 let topicPartition = Confluent.Kafka.TopicPartition(shardPartition.ShardId, shardPartition.ShardPartitionId)
-                let offset = Confluent.Kafka.Offset(shardPartitionOffset)
+                let offset = Confluent.Kafka.Offset(shardPartitionPosition)
                 Confluent.Kafka.TopicPartitionOffset(tp = topicPartition, offset = offset)
             )
             
-    do kafkaConsumer.Assign kafkaTopicPartitionOffsets
+    do kafkaConsumer.Assign kafkaTopicPartitionPositions
 
     member this.Poll(duration: TimeSpan):unit =
         kafkaConsumer.Poll duration
