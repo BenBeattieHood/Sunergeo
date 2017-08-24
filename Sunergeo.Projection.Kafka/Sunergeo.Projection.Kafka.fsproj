@@ -75,6 +75,11 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\FSharpResult\FSharpResult\FSharpResult.fsproj">
+      <Name>FSharpResult</Name>
+      <Project>{d054483f-9820-45c2-b52c-dce7894583b7}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Sunergeo.Core\Sunergeo.Core.fsproj">
       <Name>Sunergeo.Core</Name>
       <Project>{7a2ead93-127d-4066-af91-bf528097cea9}</Project>
@@ -83,6 +88,11 @@
     <ProjectReference Include="..\Sunergeo.Kafka\Sunergeo.Kafka.fsproj">
       <Name>Sunergeo.Kafka</Name>
       <Project>{27d7ee6a-9ca2-4d1c-b02c-c91aac2ec0b5}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.KeyValueStorage\Sunergeo.KeyValueStorage.fsproj">
+      <Name>Sunergeo.KeyValueStorage</Name>
+      <Project>{1f5a780b-974c-4e53-b513-06c73770db0f}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\Sunergeo.Projection\Sunergeo.Projection.fsproj">

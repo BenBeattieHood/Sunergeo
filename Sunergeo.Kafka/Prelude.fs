@@ -41,3 +41,11 @@ module TopicPartition =
             ShardId = topicPartition.Topic
             ShardPartitionId = topicPartition.Partition
         } : Sunergeo.Core.ShardPartition
+
+    let ofShardPartition
+        (shardPartition: Sunergeo.Core.ShardPartition)
+        : Confluent.Kafka.TopicPartition =
+        Confluent.Kafka.TopicPartition(
+            topic = shardPartition.ShardId
+            partition = shardPartition.ShardPartitionId
+            )

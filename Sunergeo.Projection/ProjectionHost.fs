@@ -26,6 +26,10 @@ module ProjectionUtils =
         |> stringJoin "-"
 
 
+
+
+
+
 type ProjectionHostConfig<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = {
     Logger: Logger
     ShardPartitionListeners: (unit -> unit) list

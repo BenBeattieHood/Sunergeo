@@ -30,7 +30,18 @@ type KeyValueProjector<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion wh
                     sprintf "No snapshot exists" |> WriteError.Error |> Result.Error
 
                 | Some (snapshot, version), EventLogItemData.Init init ->
-                    if snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition <= shardPartitionPosition
+                    if snapshot.ShardPartition <> shardPartition
+                    then
+                        // replaying from a new partition, allow re-init
+                        let newState = config.CreateState aggregateId init
+                        config.KeyValueStore.Create
+                            aggregateId
+                            {
+                                Snapshot.ShardPartition = shardPartition 
+                                Snapshot.ShardPartitionPosition = shardPartitionPosition
+                                Snapshot.State = newState
+                            }
+                    elif snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition <= shardPartitionPosition
                     then
                         // replaying partition, but this is already projected
                         () |> Result.Ok
@@ -48,7 +59,10 @@ type KeyValueProjector<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion wh
                         }
 
                 | Some (snapshot, version), EventLogItemData.Event event ->
-                    if snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition <= shardPartitionPosition
+                    if snapshot.ShardPartition <> shardPartition
+                    then
+                        sprintf "Partition has changed, projection needs to replay" |> WriteError.Error |> Result.Error
+                    elif snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition <= shardPartitionPosition
                     then
                         // replaying partition, but this is already projected
                         () |> Result.Ok

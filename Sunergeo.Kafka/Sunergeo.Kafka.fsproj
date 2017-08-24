@@ -58,6 +58,7 @@
     <Compile Include="KafkaProducerConfig.fs" />
     <Compile Include="KafkaConsumerConfig.fs" />
     <Content Include="packages.config" />
+    <Compile Include="KafkaError.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Confluent.Kafka">
