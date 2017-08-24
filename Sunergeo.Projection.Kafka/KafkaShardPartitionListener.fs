@@ -1,7 +1,6 @@
 ﻿namespace Sunergeo.Projection.Kafka
 
 open Sunergeo.Core
-open Sunergeo.Projection
 open Sunergeo.Logging
 open Sunergeo.Kafka
 
@@ -13,7 +12,7 @@ type KafkaShardPartitionListenerConfig<'AggregateId, 'Init, 'Events, 'ShardParti
     ConsumerConfig: KafkaConsumerConfig
     ShardId: ShardId
     ShardPartitionStore: Sunergeo.KeyValueStorage.IReadOnlyKeyValueStore<ShardPartition, ShardPartitionPosition, 'ShardPartitionStoreKeyValueVersion>
-    OnItemReceived: ShardPartition -> ShardPartitionPosition -> EventLogItem<'AggregateId, 'Init, 'Events> -> unit
+    OnRead: ShardPartition -> ShardPartitionPosition -> EventLogItem<'AggregateId, 'Init, 'Events> -> unit
     Deserialize: byte[] -> EventLogItem<'AggregateId, 'Init, 'Events>
 }
 
@@ -91,20 +90,13 @@ type KafkaShardPartitionListener<'AggregateId, 'Init, 'Events, 'ShardPartitionSt
 
     do kafkaConsumer.OnMessage.Add
         (fun message ->
+            let shardPartition = message.TopicPartition |> TopicPartition.toShardPartition
             let shardPartitionPosition:ShardPartitionPosition = message.Offset.Value
-            message.Value |> config.Deserialize |> (config.OnItemReceived shardPartition shardPartitionPosition)
+            message.Value 
+            |> config.Deserialize 
+            |> config.OnRead shardPartition shardPartitionPosition
         )
-
-    let kafkaTopicPartitionPositions =
-        config.ShardPartitions
-        |> Map.toSeq
-        |> Seq.map
-            (fun (shardPartition, shardPartitionPosition) ->
-                let topicPartition = Confluent.Kafka.TopicPartition(shardPartition.ShardId, shardPartition.ShardPartitionId)
-                let offset = Confluent.Kafka.Offset(shardPartitionPosition)
-                Confluent.Kafka.TopicPartitionOffset(tp = topicPartition, offset = offset)
-            )
-            
+    
     do kafkaConsumer.Subscribe [| config.ShardId |]
 
     member this.Poll(duration: TimeSpan):unit =
