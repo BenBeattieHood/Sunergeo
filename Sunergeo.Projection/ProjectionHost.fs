@@ -2,6 +2,7 @@
 
 open Sunergeo.Core
 open Sunergeo.Logging
+open Sunergeo.KeyValueStorage
 
 open System
 open Akka.FSharp
@@ -28,6 +29,9 @@ module ProjectionUtils =
 
 
 
+type ProjectionActorMessage<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = 
+    ShardPartitionPosition *
+    EventLogItem<'AggregateId, 'Init, 'Events>
 
 type Projector<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = 
     ShardPartition ->
@@ -36,14 +40,16 @@ type Projector<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> =
                 Async<Result<unit, Error>>
 
 type ProjectionHostConfig<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion when 'AggregateId : comparison and 'ShardPartitionStoreKeyValueVersion : comparison> = {
+    ProjectionHostId: string
     Logger: Logger
-    ShardPartitionStore: Sunergeo.KeyValueStorage.IKeyValueStore<ShardPartition, ShardPartitionPosition, 'ShardPartitionStoreKeyValueVersion>
+    ShardPartitionPositionStore: IKeyValueStore<ShardPartition, ShardPartitionPosition, 'ShardPartitionStoreKeyValueVersion>
     Projectors: Projector<'AggregateId, 'Init, 'Events> list
     ProjectorsPerShardPartition: int
 }
-type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion when 'AggregateId : comparison and 'ShardPartitionStoreKeyValueVersion : comparison>(config: ProjectionHostConfig<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion>) as this = 
+type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion when 'AggregateId : comparison and 'ShardPartitionStoreKeyValueVersion : comparison>(config: ProjectionHostConfig<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion>) = 
     
     let createProjectionActor
+        (shardPartitionPositionStore: IKeyValueStore<ShardPartition, ShardPartitionPosition, 'ShardPartitionStoreKeyValueVersion>)
         (actorSystem: Akka.Actor.ActorSystem)
         (shardPartition: ShardPartition)
         (projectionPartitionIndex: int)
@@ -51,13 +57,18 @@ type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVe
         (projector: Projector<'AggregateId, 'Init, 'Events>)
         : Akka.Actor.IActorRef =
         let projectionActorF =
-            (fun (mailbox: Actor<ShardPartitionPosition * EventLogItem<'AggregateId, 'Init, 'Events>>) ->
+            (fun (mailbox: Actor<ProjectionActorMessage<'AggregateId, 'Init, 'Events>>) ->
                 let rec loop _ =
                     actor {
                         let! position, message = mailbox.Receive()
                         do projector shardPartition position message
                             |> Async.RunSynchronously
                             |> ResultModule.get
+                        
+                        do position 
+                            |> KeyValueStorageUtils.createOrPut shardPartitionPositionStore shardPartition
+                            |> ResultModule.get
+
                         return! loop ()
                     }
                 loop ()
@@ -67,6 +78,7 @@ type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVe
         projectionActor
 
     let createProjectionPartition
+        (shardPartitionPositionStore: IKeyValueStore<ShardPartition, ShardPartitionPosition, 'ShardPartitionStoreKeyValueVersion>)
         (actorSystem: Akka.Actor.ActorSystem)
         (shardPartition: ShardPartition)
         (projectionPartitionIndex: int)
@@ -74,7 +86,7 @@ type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVe
         : Akka.Actor.IActorRef list =
 
         projectors
-        |> List.mapi (createProjectionActor actorSystem shardPartition projectionPartitionIndex)
+        |> List.mapi (createProjectionActor shardPartitionPositionStore actorSystem shardPartition projectionPartitionIndex)
 
     let getPartitionForId
         (id: 'a)
@@ -87,10 +99,11 @@ type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVe
 
     let createOrLoadProjectionPartitionWith
         (projectors: Projector<'AggregateId, 'Init, 'Events> list)
+        (projectorsPerShardPartition: int)
+        (shardPartitionPositionStore: IKeyValueStore<ShardPartition, ShardPartitionPosition, 'ShardPartitionStoreKeyValueVersion>)
         (actorSystem: Akka.Actor.ActorSystem)
         (shardPartition: ShardPartition)
         (aggregateId: 'AggregateId)
-        (projectorsPerShardPartition: int)
         : Akka.Actor.IActorRef list =
         let projectionPartitions =
             actors
@@ -108,7 +121,7 @@ type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVe
                                         [0 .. projectorsPerShardPartition - 1]
                                         |> List.map
                                             (fun projectionPartitionIndex -> 
-                                                createProjectionPartition actorSystem shardPartition projectionPartitionIndex projectors
+                                                createProjectionPartition shardPartitionPositionStore actorSystem shardPartition projectionPartitionIndex projectors
                                             )
                                     actors <- actors |> Map.add shardPartition projectionPartitions
 
@@ -118,19 +131,41 @@ type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVe
                 )
         projectionPartitions |> getPartitionForId aggregateId
         
-//    let akkaConfigurationString = 
-//        Sunergeo.Akka.Configuration.ConfigurationBuilder.Create(
-//            defaultSerializer = typeof<Hyperion.Serializer>,
-//            byteArraySerializer = typeof<Hyperion.ValueSerializers.ByteArraySerializer>
-//            )
+    let akkaConfigurationString = 
+        Sunergeo.Akka.Configuration.ConfigurationBuilder.Create(
+            defaultSerializer = typeof<Hyperion.Serializer>,
+            byteArraySerializer = typeof<Hyperion.ValueSerializers.ByteArraySerializer>
+            )
 
-//    let actorSystemName =
-//        config.ShardPartitionPositions
-//        |> List.map fst
-//        |> ProjectionUtils.getShardPartitionsName
-        
-//    let akkaConfiguration = Akka.Configuration.ConfigurationFactory.ParseString(akkaConfigurationString)
-//    let actorSystem = Akka.FSharp.System.create (actorSystemName + "-projectionhost") akkaConfiguration
+    let akkaConfiguration = Akka.Configuration.ConfigurationFactory.ParseString(akkaConfigurationString)
+    let actorSystem = Akka.FSharp.System.create (config.ProjectionHostId + "-projectionhost") akkaConfiguration
+    
+    let createOrLoadProjectionPartition =
+        createOrLoadProjectionPartitionWith
+            config.Projectors
+            config.ProjectorsPerShardPartition
+            config.ShardPartitionPositionStore
+            actorSystem
+
+    member this.OnEvent
+        (shardPartition: ShardPartition)
+        (shardPartitionPosition: ShardPartitionPosition)
+        (item: EventLogItem<'AggregateId, 'Init, 'Events>)
+        :unit =
+        let projectionPartition = createOrLoadProjectionPartition shardPartition item.Metadata.AggregateId
+        for projectionActor in projectionPartition do
+            let projectionActorMessage:ProjectionActorMessage<'AggregateId, 'Init, 'Events> =
+                shardPartitionPosition,
+                item
+            projectionActor <! projectionActorMessage
+
+    //member this.OnEvent 
+    //    (
+    //        (aggregateId: 'AggregateId),
+    //        (event: EventLogItem<'AggregateId, 'Init, 'Events>)
+    //    ):unit =
+    //    let actor = aggregateId |> createOrLoadProjectionPartition actorSystem
+    //    actor <! event
 
 //    let createOrLoadProjectionActor =
 //        createOrLoadProjectionActorWith (createProjectionActor actorSystem)
@@ -157,14 +192,7 @@ type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVe
 //                Spawn. actorSystem actorId shardPartitionListeningActorF
 //            )
 
-//    member this.OnEvent 
-//        (
-//            (aggregateId: 'AggregateId),
-//            (event: EventLogItem<'AggregateId, 'Init, 'Events>)
-//        ):unit =
-//        let actor = aggregateId |> createOrLoadProjectionActor actorSystem
-//        actor <! event
     
-//    interface System.IDisposable with
-//        member this.Dispose() = 
-//            actorSystem.Dispose()
+    interface System.IDisposable with
+        member this.Dispose() = 
+            actorSystem.Dispose()

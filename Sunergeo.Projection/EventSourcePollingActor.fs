@@ -9,8 +9,8 @@ open Akka.Actor
 type EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events, 'StateKeyValueVersion when 'AggregateId : comparison and 'StateKeyValueVersion : comparison> = {
     Logger: Logger
     EventSource: Sunergeo.EventSourcing.Memory.IEventSource<'AggregateId, 'Init, 'Events>
-    GetPollPositionState: unit -> Async<Map<'AggregateId, int>>
-    SetPollPositionState: Map<'AggregateId, int> -> Async<unit>
+    GetPollPositionState: unit -> Async<Map<'AggregateId, ShardPartitionPosition>>
+    SetPollPositionState: Map<'AggregateId, ShardPartitionPosition> -> Async<unit>
 }
 type EventSourcePollingActor<'AggregateId, 'Init, 'State, 'Events, 'StateKeyValueVersion when 'AggregateId : comparison and 'StateKeyValueVersion : comparison>(config: EventSourcePollingActorConfig<'AggregateId, 'Init, 'Events, 'StateKeyValueVersion>, instanceId: InstanceId, onEvent: ('AggregateId * EventLogItem<'AggregateId, 'Init, 'Events>) -> unit) as this =
     inherit ReceiveActor()
@@ -42,7 +42,8 @@ type EventSourcePollingActor<'AggregateId, 'Init, 'State, 'Events, 'StateKeyValu
                         | Some processedPositionId ->
                             Some (aggregateId, processedPositionId)
                         | None ->
-                            Some (aggregateId, 0)
+                            let processedPositionId:ShardPartitionPosition = 0 |> int64
+                            Some (aggregateId, processedPositionId)
                     )
                 |> Seq.map
                     (fun (aggregateId, positionId) ->
@@ -61,9 +62,9 @@ type EventSourcePollingActor<'AggregateId, 'Init, 'State, 'Events, 'StateKeyValu
                 for logEntry in logEntries do
                     onEvent (aggregateId, logEntry.Item)
 
-                    pollState <-
-                        pollState
-                        |> Map.add aggregateId logEntry.Position
+                    //pollState <-
+                    //    pollState
+                    //    |> Map.add aggregateId logEntry.Position
 
                     do! config.SetPollPositionState pollState
         }

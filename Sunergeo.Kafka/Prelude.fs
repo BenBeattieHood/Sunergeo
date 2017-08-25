@@ -46,6 +46,6 @@ module TopicPartition =
         (shardPartition: Sunergeo.Core.ShardPartition)
         : Confluent.Kafka.TopicPartition =
         Confluent.Kafka.TopicPartition(
-            topic = shardPartition.ShardId
+            topic = shardPartition.ShardId,
             partition = shardPartition.ShardPartitionId
             )

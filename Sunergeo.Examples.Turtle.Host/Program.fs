@@ -10,7 +10,7 @@ open Sunergeo.KeyValueStorage
 open Sunergeo.KeyValueStorage.Memory
 open Sunergeo.Logging
 open Sunergeo.Projection
-open Sunergeo.Projection.Default
+open Sunergeo.Projection.Kafka
 open Sunergeo.Web
 open Sunergeo.Web.Commands
 open Sunergeo.Web.Queries
@@ -27,6 +27,7 @@ open Sunergeo.Examples.Turtle.Aggregate
 open Sunergeo.Examples.Turtle.Commands
 open Sunergeo.Examples.Turtle.Queries
 open Microsoft.AspNetCore.Http
+open System.IO
 
 // nb https://github.com/aspnet/KestrelHttpServer/issues/1652#issuecomment-293224372
 
@@ -97,7 +98,10 @@ let ofExecQuery<'Result>
 let main argv = 
     //let assemblies = [typeof<Turtle>.Assembly]
 
-    let instanceId:InstanceId = "123"
+    let instanceId:InstanceId = 123
+    let shardId =
+        instanceId
+        |> Utils.toShardId<Turtle>
 
     let logger =
         (fun (logLevel: LogLevel) (message: string) ->
@@ -118,10 +122,10 @@ let main argv =
 
     //sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
     //|> Console.WriteLine
-
+    
     let eventStoreImplementationConfig:MemoryEventStoreImplementationConfig<TurtleId, Turtle, MemoryKeyValueVersion> = 
         {
-            InstanceId = instanceId
+            ShardId = shardId
             Logger = logger
             SnapshotStore = snapshotStore
         }
@@ -190,25 +194,26 @@ let main argv =
     //        Logger = logger
     //        TableName = (instanceId |> Utils.toShardId<Turtle>) + "-ReadStore"
     //    }
-
-    let readStore = MemoryKeyValueStore()
+    
+    let shardPartitionPositionStore = MemoryKeyValueStore<ShardPartition, ShardPartitionPosition>()
+    let readStore = MemoryKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>>()
 
     // use akkaSignalr = Sunergeo.AkkaSignalr.Consumer.Program.StartAkkaAndSignalr()
     
-    let mutable pollPositionState:Map<TurtleId, int> = Map.empty
-    let pollingActorConfig:Sunergeo.Projection.EventSourcePollingActorConfig<TurtleId, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
-        {
-            Logger = logger
-            EventSource = eventStoreImplementation :> Sunergeo.EventSourcing.Memory.IEventSource<TurtleId, Turtle, TurtleEvent>
-            GetPollPositionState =
-                (fun _ ->
-                    async { return pollPositionState }
-                )
-            SetPollPositionState = 
-                (fun x ->
-                    async { pollPositionState <- x }
-                )
-        }
+    //let mutable pollPositionState:Map<TurtleId, int> = Map.empty
+    //let pollingActorConfig:Sunergeo.Projection.EventSourcePollingActorConfig<TurtleId, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
+    //    {
+    //        Logger = logger
+    //        EventSource = eventStoreImplementation :> Sunergeo.EventSourcing.Memory.IEventSource<TurtleId, Turtle, TurtleEvent>
+    //        GetPollPositionState =
+    //            (fun _ ->
+    //                async { return pollPositionState }
+    //            )
+    //        SetPollPositionState = 
+    //            (fun x ->
+    //                async { pollPositionState <- x }
+    //            )
+    //    }
         //KafkaPollingActorConfig = 
         //    {
         //        KafkaUri = eventSourceConfig.LogUri
@@ -217,22 +222,57 @@ let main argv =
         //        StatisticsIntervalMs = 60000
         //        Servers = "localhost:9092"
         //    }
+
+    let serializerConfig = 
+        Hyperion.SerializerOptions(
+            versionTolerance = true,
+            preserveObjectReferences = true,
+            surrogates = null,
+            serializerFactories = null,
+            knownTypes = null,
+            ignoreISerializable = true
+            )
+    let serializer = Hyperion.Serializer(serializerConfig)
         
-    let projectionHostConfig:ProjectionHostConfig<KeyValueStorageProjectionConfig<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>, TurtleId, Turtle, TurtleEvent, EventSourcePollingActor<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>> = 
+    let projectorConfig:Sunergeo.Projection.KeyValueStorage.KeyValueProjectorConfig<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion> =
         {
             Logger = logger
-            InstanceId = instanceId
-            ActorConfig = 
+            KeyValueStore = readStore
+            CreateState = DefaultReadStore.create
+            Fold = DefaultReadStore.fold
+        }
+    let projectionHostConfig:KafkaProjectionHostConfig<TurtleId, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
+        {
+            ProjectionHostId = sprintf "%s-projectionhost" shardId
+            Logger = logger
+            ShardPartitionPositionStore = shardPartitionPositionStore
+            Projectors =
+                [
+                    Sunergeo.Projection.KeyValueStorage.keyValueProjector<TurtleId, Turtle, TurtleEvent, int>
+                ]
+            ProjectorsPerShardPartition = 5
+            KafkaConsumerConfig =
                 {
-                    Logger = logger
-                    KeyValueStore = readStore
-                    CreateState = DefaultReadStore.create
-                    FoldState = DefaultReadStore.fold
+                    Sunergeo.Kafka.KafkaConsumerConfig.Default with
+                        Sunergeo.Kafka.KafkaConsumerConfig.ClientId = sprintf "%s-projectionhost" shardId
                 }
-            CreatePollingActor = 
-                (fun instanceId onEvent ->
-                    EventSourcePollingActor(pollingActorConfig, instanceId, onEvent)
+            ShardId = shardId
+            Deserialize = 
+                (fun bytes ->
+                    use stream = new MemoryStream(bytes)
+                    stream |> serializer.Deserialize
                 )
+            //ActorConfig = 
+            //    {
+            //        Logger = logger
+            //        KeyValueStore = readStore
+            //        CreateState = DefaultReadStore.create
+            //        FoldState = DefaultReadStore.fold
+            //    }
+            //CreatePollingActor = 
+            //    (fun instanceId onEvent ->
+            //        EventSourcePollingActor(pollingActorConfig, instanceId, onEvent)
+            //    )
         }
 
     use projectionHost = new KeyValueStoreProjectorHost<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion, EventSourcePollingActor<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>>(projectionHostConfig)

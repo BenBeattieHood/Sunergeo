@@ -54,6 +54,7 @@
     <Compile Include="IKeyValueStore.fs" />
     <Compile Include="MemoryKeyValueStorage.fs" />
     <Content Include="packages.config" />
+    <Compile Include="Utils.fs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="FSharp.Core">

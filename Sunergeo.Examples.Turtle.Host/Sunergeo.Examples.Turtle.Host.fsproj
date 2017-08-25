@@ -233,6 +233,11 @@
       <Project>{7a2ead93-127d-4066-af91-bf528097cea9}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.EventSourcing.Kafka\Sunergeo.EventSourcing.Kafka.fsproj">
+      <Name>Sunergeo.EventSourcing.Kafka</Name>
+      <Project>{c6d79b49-c915-457a-a6ba-e524cbb0c587}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Sunergeo.EventSourcing\Sunergeo.EventSourcing.fsproj">
       <Name>Sunergeo.EventSourcing</Name>
       <Project>{bca1c940-bd2e-4822-951e-16941f87de95}</Project>
@@ -243,14 +248,24 @@
       <Project>{d99fb3dc-f1f1-43eb-92a8-71fe479df25a}</Project>
       <Private>True</Private>
     </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.Kafka\Sunergeo.Kafka.fsproj">
+      <Name>Sunergeo.Kafka</Name>
+      <Project>{27d7ee6a-9ca2-4d1c-b02c-c91aac2ec0b5}</Project>
+      <Private>True</Private>
+    </ProjectReference>
     <ProjectReference Include="..\Sunergeo.KeyValueStorage\Sunergeo.KeyValueStorage.fsproj">
       <Name>Sunergeo.KeyValueStorage</Name>
       <Project>{1f5a780b-974c-4e53-b513-06c73770db0f}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Sunergeo.Projection.Default\Sunergeo.Projection.Default.fsproj">
-      <Name>Sunergeo.Projection.Default</Name>
-      <Project>{ba07eb4a-88c2-4f62-adda-192f88a405c3}</Project>
+    <ProjectReference Include="..\Sunergeo.Projection.Kafka\Sunergeo.Projection.Kafka.fsproj">
+      <Name>Sunergeo.Projection.Kafka</Name>
+      <Project>{d6c7d022-90c7-4aef-8699-2c9712cf3bd1}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.Projection.KeyValueStorage\Sunergeo.Projection.KeyValueStorage.fsproj">
+      <Name>Sunergeo.Projection.KeyValueStorage</Name>
+      <Project>{7a90965e-a52c-4a55-8be4-7c8242de33db}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\Sunergeo.Projection\Sunergeo.Projection.fsproj">

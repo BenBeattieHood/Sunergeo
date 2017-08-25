@@ -57,9 +57,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <Content Include="packages.config" />
     <Compile Include="EventSourcePollingActor.fs" />
-    <Compile Include="Projector.fs" />
     <Compile Include="ProjectionHost.fs" />
-    <Compile Include="KafkaPollingActor.fs" />
     <Compile Include="PollingActor.fs" />
   </ItemGroup>
   <ItemGroup>

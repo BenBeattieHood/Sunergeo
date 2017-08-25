@@ -9,16 +9,16 @@ open Confluent.Kafka
 
 type KafkaShardPartitionListenerConfig<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion when 'AggregateId : comparison and 'ShardPartitionStoreKeyValueVersion : comparison> = {
     Logger: Logger
-    ConsumerConfig: KafkaConsumerConfig
+    KafkaConsumerConfig: KafkaConsumerConfig
     ShardId: ShardId
-    ShardPartitionStore: Sunergeo.KeyValueStorage.IReadOnlyKeyValueStore<ShardPartition, ShardPartitionPosition, 'ShardPartitionStoreKeyValueVersion>
+    ShardPartitionPositionStore: Sunergeo.KeyValueStorage.IReadOnlyKeyValueStore<ShardPartition, ShardPartitionPosition, 'ShardPartitionStoreKeyValueVersion>
     OnRead: ShardPartition -> ShardPartitionPosition -> EventLogItem<'AggregateId, 'Init, 'Events> -> unit
     Deserialize: byte[] -> EventLogItem<'AggregateId, 'Init, 'Events>
 }
 
 type KafkaShardPartitionListener<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion when 'AggregateId : comparison and 'ShardPartitionStoreKeyValueVersion : comparison>(config: KafkaShardPartitionListenerConfig<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion>) =
     
-    let kafkaConsumer = new Confluent.Kafka.Consumer(config.ConsumerConfig |> KafkaConsumerConfig.toKafkaConfig)
+    let kafkaConsumer = new Confluent.Kafka.Consumer(config.KafkaConsumerConfig |> KafkaConsumerConfig.toKafkaConfig)
 
     do kafkaConsumer.OnError.Add
         (fun error ->
@@ -53,7 +53,7 @@ type KafkaShardPartitionListener<'AggregateId, 'Init, 'Events, 'ShardPartitionSt
 
             let shardPartitionsAndPositionsResult =
                 shardPartitions
-                |> Seq.map (fun a -> a |> config.ShardPartitionStore.Get |> ResultModule.map (fun b -> a, b |> Option.map fst))
+                |> Seq.map (fun a -> a |> config.ShardPartitionPositionStore.Get |> ResultModule.map (fun b -> a, b |> Option.map fst))
                 |> ResultModule.ofSeq
 
             match shardPartitionsAndPositionsResult with

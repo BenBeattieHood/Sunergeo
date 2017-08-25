@@ -96,7 +96,7 @@ type MemoryLogTopic<'AggregateId, 'Item when 'AggregateId : comparison>() =
 
     member this.ReadFrom
         (aggregateId: 'AggregateId)
-        (position: int)
+        (position: ShardPartitionPosition)
         : LogEntry<'Item> seq option =
 
         eventSource
@@ -109,8 +109,8 @@ type MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion
 }
 
 type IEventSource<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> =
-    abstract member GetPositions: unit -> Async<Map<'AggregateId, int>>
-    abstract member ReadFrom: 'AggregateId -> int -> Async<LogEntry<EventLogItem<'AggregateId, 'Init, 'Events>> seq option>
+    abstract member GetPositions: unit -> Async<Map<'AggregateId, ShardPartitionPosition>>
+    abstract member ReadFrom: 'AggregateId -> ShardPartitionPosition -> Async<LogEntry<EventLogItem<'AggregateId, 'Init, 'Events>> seq option>
 
 type MemoryEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: MemoryEventStoreImplementationConfig<'AggregateId, 'State, 'KeyValueVersion>) = 
     let memoryTopic = new MemoryLogTopic<'AggregateId, EventLogItem<'AggregateId, 'Init, 'Events>>()

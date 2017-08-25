@@ -21,8 +21,6 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Projection", "Sune
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Examples.Turtle.Host", "Sunergeo.Examples.Turtle.Host\Sunergeo.Examples.Turtle.Host.fsproj", "{D0E92611-5C05-4A02-B1DF-8B6A0E997110}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Projection.Default", "Sunergeo.Projection.Default\Sunergeo.Projection.Default.fsproj", "{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sunergeo.AkkaSignalr.Consumer", "Sunergeo.AkkaSignalr.Consumer\Sunergeo.AkkaSignalr.Consumer.csproj", "{72014EE3-9761-4333-96A2-CAE649B2A8F5}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.EventSourcing.Kafka", "Sunergeo.EventSourcing.Kafka\Sunergeo.EventSourcing.Kafka.fsproj", "{C6D79B49-C915-457A-A6BA-E524CBB0C587}"
@@ -79,10 +77,6 @@ Global
 		{D0E92611-5C05-4A02-B1DF-8B6A0E997110}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D0E92611-5C05-4A02-B1DF-8B6A0E997110}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D0E92611-5C05-4A02-B1DF-8B6A0E997110}.Release|Any CPU.Build.0 = Release|Any CPU
-		{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{BA07EB4A-88C2-4F62-ADDA-192F88A405C3}.Release|Any CPU.Build.0 = Release|Any CPU
 		{72014EE3-9761-4333-96A2-CAE649B2A8F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{72014EE3-9761-4333-96A2-CAE649B2A8F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{72014EE3-9761-4333-96A2-CAE649B2A8F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
