@@ -4,16 +4,14 @@ open Sunergeo.Core
 open Sunergeo.Logging
 open Sunergeo.KeyValueStorage
 
-type KeyValueStorageProjectionConfig<'PartitionId, 'State, 'Events when 'PartitionId : comparison> = {
+type KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     Logger: Logger
-    KeyValueStorageConfig: Sunergeo.KeyValueStorage.KeyValueStorageConfig
-    CreateState: EventSourceInitItem<'PartitionId> -> 'State
+    CreateState: EventSourceInitItem<'AggregateId, 'Init> -> 'State
     FoldState: 'State -> 'Events -> 'State
+    KeyValueStore: IKeyValueStore<'AggregateId, 'State, 'KeyValueVersion>
 }
-type KeyValueStoreProjector<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: KeyValueStorageProjectionConfig<'PartitionId, 'State, 'Events>, partitionId: 'PartitionId) =
-    inherit Sunergeo.Projection.Projector<'PartitionId, 'Events>()
-
-    let keyValueStore = new KeyValueStore<'PartitionId, 'State>(config.KeyValueStorageConfig)
+type KeyValueStoreProjector<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, aggregateId: 'AggregateId) =
+    inherit Sunergeo.Projection.Projector<'AggregateId, 'Init, 'Events>()
 
     let processWriteResult 
         (writeResult: Result<unit, WriteError>)
@@ -22,67 +20,67 @@ type KeyValueStoreProjector<'PartitionId, 'State, 'Events when 'PartitionId : co
         | Ok unit -> unit
         | Result.Error error -> 
             match error with
-            | WriteError.Timeout -> 
-                "KeyValueStore timeout"
-            | WriteError.InvalidVersion ->
-                "KeyValueStore invalid version"
-            | WriteError.Error error ->
-                error
-
+            | WriteError.Timeout -> "KeyValueStore timeout"
+            | WriteError.InvalidVersion -> "KeyValueStore invalid version"
+            | WriteError.Error error -> error
             |> config.Logger LogLevel.Error
+            
+    let processWithState 
+        (f: Option<'State * 'KeyValueVersion> -> unit)
+        : unit =
+        match config.KeyValueStore.Get aggregateId with
+        | Ok x -> f x
+        | Result.Error error ->
+            match error with
+            | ReadError.Timeout -> "KeyValueStore timeout"
+            | ReadError.Error error -> error
+            |> config.Logger LogLevel.Error
+            
+    override this.Process(eventLogItem:EventLogItem<'AggregateId, 'Init, 'Events>):unit =
 
-
-    override this.Process(eventLogItem):unit =
         match eventLogItem with
         | EventLogItem.Init init ->
-            // TODO - check state doesn't already exist? Maybe silent failure is better in this case
+            (function
+            | Some state ->
+                sprintf "State already present for init %O %O" init state
+                |> config.Logger LogLevel.Error
 
-            let newState = 
-                init
-                |> config.CreateState
+            | None ->
+                let newState = 
+                    init
+                    |> config.CreateState
             
-            let writeResult =
-                keyValueStore.Create
-                    partitionId
-                    newState
+                let writeResult =
+                    config.KeyValueStore.Create
+                        aggregateId
+                        newState
 
-            writeResult |> processWriteResult
+                writeResult |> processWriteResult
+            )
+            |> processWithState
 
         | EventLogItem.Event event ->
-            let state =
-                keyValueStore.Get partitionId
-
-            match state with
-            | Ok (Some (state, version)) ->
+        
+            (function
+            | None ->
+                sprintf "No state found for event %O" event
+                |> config.Logger LogLevel.Error
                 
+            | Some (state, version) ->
                 let newState =
                     event
                     |> config.FoldState state
 
                 let writeResult = 
-                    keyValueStore.Put
-                        partitionId
+                    config.KeyValueStore.Put
+                        aggregateId
                         (newState, version)
                         
                 writeResult |> processWriteResult
+            )
+            |> processWithState
 
-            | Ok None ->
-                sprintf "No state found for event %O" event
-                |> config.Logger LogLevel.Error
 
-            | Result.Error error ->
-                match error with
-                | ReadError.Timeout -> 
-                    "KeyValueStore timeout"
-                | ReadError.Error error ->
-                    error
-
-                |> config.Logger LogLevel.Error
-    
-    override this.PostStop() =
-        (keyValueStore :> System.IDisposable).Dispose()
-        base.PostStop()
-
-type KeyValueStoreProjectorHost<'PartitionId, 'State, 'Events when 'PartitionId : comparison>(config: Sunergeo.Projection.ProjectionHostConfig<KeyValueStorageProjectionConfig<'PartitionId, 'State, 'Events>, 'PartitionId>) =
-    inherit Sunergeo.Projection.ProjectionHost<KeyValueStorageProjectionConfig<'PartitionId, 'State, 'Events>, 'PartitionId, 'State, 'Events>(config)
-    override this.CreateActor config partitionId = upcast new KeyValueStoreProjector<'PartitionId, 'State, 'Events>(config, partitionId)
+type KeyValueStoreProjectorHost<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion, 'PollingActor when 'AggregateId : comparison and 'KeyValueVersion : comparison>(config: Sunergeo.Projection.ProjectionHostConfig<KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'AggregateId, 'Init, 'Events, 'PollingActor>) =
+    inherit Sunergeo.Projection.ProjectionHost<KeyValueStorageProjectionConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>, 'AggregateId, 'Init, 'State, 'Events, 'PollingActor>(config)
+    override this.CreateActor config aggregateId = upcast new KeyValueStoreProjector<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>(config, aggregateId)

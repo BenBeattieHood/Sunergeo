@@ -8,14 +8,14 @@ open Sunergeo.Web
 open Microsoft.AspNetCore.Http
 
 
-type RoutedType<'TargetType, 'Result> = {
+type RoutedType<'HandlerType, 'Result> = {
     PathAndQuery: string
     HttpMethod: HttpMethod
-    Exec: 'TargetType -> Context -> HttpRequest -> Result<'Result, Error>
+    Exec: 'HandlerType -> Context -> HttpRequest -> Async<Result<'Result, Error>>
 }
 
 type RoutedTypeRequestHandler<'Result> = 
-    Context -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error> option
+    Context -> Microsoft.AspNetCore.Http.HttpRequest -> Option<unit -> Async<Result<'Result, Error>>>
 
 
 let routePathAndQueryVariableRegex = Regex(@"\{(.+?)\}", RegexOptions.Compiled)
@@ -50,13 +50,14 @@ let createUriPathOrQueryParamParser
         (fun s -> Sunergeo.Core.Todo.todo<obj>())
 
 
-let createHandler 
+let createHandler<'TargetType, 'Result>
     (routedType: RoutedType<'TargetType, 'Result>)
     :RoutedTypeRequestHandler<'Result> =
     let pathAndQueryRegexString = routedType.PathAndQuery |> routePathAndQueryToRegexString
     let pathAndQueryRegex = Regex(pathAndQueryRegexString, RegexOptions.Compiled)
 
-    let ctor = typeof<'TargetType>.GetConstructors().[0]      // assume a record type
+    let t = typeof<'TargetType>
+    let ctor = t.GetConstructors().[0]      // assume a record type
     let ctorParams = ctor.GetParameters()
 
     let regexGroupNames = 
@@ -141,10 +142,30 @@ let createHandler
                         ctorParamValues
                         |> targetActivator.Invoke
                         
-                    routedType.Exec target context request
+                    (fun _ -> routedType.Exec target context request)
                     |> Some
                 else
                     None
             else 
                 None
     )
+
+let defaultContextProvider
+    (instanceId: InstanceId)
+    (httpContext: Microsoft.AspNetCore.Http.HttpContext)
+    : Sunergeo.Core.Context =
+    let fromCorrelationId =
+        match "x-from-correlation-id" |> httpContext.Request.Headers.TryGetValue with
+        | true, values 
+            when values.Count > 0 && String.IsNullOrEmpty(values.[0]) = false -> 
+                let result = values.[0]
+                Some (CorrelationId(result))
+        | _ -> 
+                None
+    {
+        Context.InstanceId = instanceId
+        Context.UserId = Sunergeo.Core.Todo.todo()
+        Context.WorkingAsUserId = Sunergeo.Core.Todo.todo()
+        Context.FromCorrelationId = fromCorrelationId
+        Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)
+    }

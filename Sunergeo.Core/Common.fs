@@ -1,17 +1,20 @@
 ﻿namespace Sunergeo.Core
 
-type InstanceId = string
+type InstanceId = int
+type CorrelationId = System.Guid
 type UserId = string
 
 type Context = {
+    InstanceId: InstanceId
     UserId: UserId
     WorkingAsUserId: UserId
+    FromCorrelationId: CorrelationId option
     Timestamp: NodaTime.Instant
 }
 
 type ErrorStatus =
-      PermissionDenied
-    | InvalidOp
+      InvalidOp
+    | PermissionDenied
     | Unknown
 
 type Error = {
@@ -19,14 +22,14 @@ type Error = {
     Message: string
 }
 with
-    static member PermissionDenied message = 
-        {
-            Error.Status = ErrorStatus.PermissionDenied
-            Message = message
-        }
     static member InvalidOp message = 
         {
             Error.Status = ErrorStatus.InvalidOp
+            Message = message
+        }
+    static member PermissionDenied message = 
+        {
+            Error.Status = ErrorStatus.PermissionDenied
             Message = message
         }
 

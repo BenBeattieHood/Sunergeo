@@ -6,13 +6,10 @@ open Sunergeo.Web
 
 open Routing
 
-//type LogConfig = {
-//    LogName: string
-//}
-
-type RoutedCommand<'Command, 'State, 'Events> = RoutedType<'Command, CommandResult<'State, 'Events>>
-
-type CommandHandler<'State, 'Events> = RoutedTypeRequestHandler<CommandResult<'State, 'Events>>
+type RoutedCommand<'Command, 'AggregateId when 'Command :> ICommandBase<'AggregateId> and 'AggregateId : comparison> =
+    RoutedType<'Command, unit>
+    
+type CommandHandler = RoutedTypeRequestHandler<unit>
 
 open System.Threading.Tasks
 open Microsoft.AspNetCore.Hosting
@@ -21,14 +18,13 @@ open Microsoft.AspNetCore.Http
 open Sunergeo.Logging
 open Microsoft.Extensions.DependencyInjection
 
-type CommandWebHostStartupConfig<'PartitionId, 'State, 'Events> = {
+type CommandWebHostStartupConfig<'AggregateId, 'State, 'Events when 'AggregateId : comparison> = {
     Logger: Sunergeo.Logging.Logger
     ContextProvider: HttpContext -> Context
-    Handlers: CommandHandler<'State, 'Events> list
-    OnHandle: 'PartitionId -> Context -> CommandResult<'State, 'Events> -> unit
+    Handlers: CommandHandler list
 }
 
-type CommandWebHostStartup<'PartitionId, 'State, 'Events when 'PartitionId : comparison> (config: CommandWebHostStartupConfig<'PartitionId, 'State, 'Events>) = 
+type CommandWebHostStartup<'AggregateId, 'State, 'Events when 'AggregateId : comparison> (config: CommandWebHostStartupConfig<'AggregateId, 'State, 'Events>) = 
 
     member x.Configure 
         (
@@ -43,69 +39,58 @@ type CommandWebHostStartup<'PartitionId, 'State, 'Events when 'PartitionId : com
 
                 let context = ctx |> config.ContextProvider
 
-                let result =
+                let commandHandler =
                     config.Handlers
                     |> List.tryPick
                         (fun handler ->
                             handler context ctx.Request
                         )
                         
-                result
-                |> WebHost.processResultFor ctx.Response
-                    (fun events ->
-                        events |> config.OnHandle (Sunergeo.Core.Todo.todo()) context
-                        None
-                    )
-                    (fun logLevel message -> 
-                        config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
-                    )
+                do! WebHost.runHandler
+                        commandHandler
+                        (fun _ -> None)
+                        (fun logLevel message -> 
+                            config.Logger logLevel (sprintf "%O -> %s" ctx.Request.Path message)
+                        )
+                        ctx.Response
 
             } |> Async.StartAsTask :> Task
 
         app.Run(RequestDelegate(reqHandler))
 
-type CommandWebHostConfig<'PartitionId, 'State, 'Events> = {
+type CommandWebHostConfig<'AggregateId, 'State, 'Events> = {
+    InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
-    Handlers: CommandHandler<'State, 'Events> list
-    OnHandle: 'PartitionId -> Context -> CommandResult<'State, 'Events> -> unit
+    Handlers: CommandHandler list
     BaseUri: Uri
 }
 
 module CommandWebHost =
-    let toGeneralRoutedCommand<'Command, 'State, 'Events>
-        (routedCommand: RoutedCommand<'Command, 'State, 'Events>)
-        :RoutedCommand<obj, 'State, 'Events> =
+    let toGeneralRoutedCommand<'Command, 'AggregateId when 'Command :> ICommandBase<'AggregateId> and 'AggregateId : comparison>
+        (routedCommand: RoutedCommand<'Command, 'AggregateId>)
+        :RoutedCommand<ICommandBase<'AggregateId>, 'AggregateId> =
         {
             RoutedCommand.PathAndQuery = routedCommand.PathAndQuery
             RoutedCommand.HttpMethod = routedCommand.HttpMethod
             RoutedCommand.Exec = 
-                (fun (wrappedTarget: obj) (context: Context) ->
+                (fun (wrappedTarget: ICommandBase<'AggregateId>) (context: Context) ->
                     routedCommand.Exec (wrappedTarget :?> 'Command) context
                 )
         }
 
-    let create<'PartitionId, 'State, 'Events when 'PartitionId : comparison> (config: CommandWebHostConfig<'PartitionId, 'State, 'Events>): IWebHost =
+    let create<'AggregateId, 'State, 'Events when 'AggregateId : comparison> (config: CommandWebHostConfig<'AggregateId, 'State, 'Events>): IWebHost =
             
-        let startupConfig:CommandWebHostStartupConfig<'PartitionId, 'State, 'Events> =
+        let startupConfig:CommandWebHostStartupConfig<'AggregateId, 'State, 'Events> =
             {
                 Logger = config.Logger
                 Handlers = config.Handlers
-                OnHandle = config.OnHandle
-                ContextProvider = 
-                    (fun _ -> 
-                        {
-                            // TODO:
-                            Context.UserId = ""
-                            Context.WorkingAsUserId = ""
-                            Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)
-                        }
-                    )
+                ContextProvider = defaultContextProvider config.InstanceId
             }
 
         WebHostBuilder()
-            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig<'PartitionId, 'State, 'Events>>(startupConfig) |> ignore)
+            .ConfigureServices(fun services -> services.AddSingleton<CommandWebHostStartupConfig<'AggregateId, 'State, 'Events>>(startupConfig) |> ignore)
             .UseKestrel()
-            .UseStartup<CommandWebHostStartup<'PartitionId, 'State, 'Events>>()
+            .UseStartup<CommandWebHostStartup<'AggregateId, 'State, 'Events>>()
             .UseUrls(config.BaseUri |> string)
             .Build()
       

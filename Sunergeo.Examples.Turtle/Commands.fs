@@ -20,7 +20,7 @@ type CreateCommand =
         member this.GetId context = this.TurtleId
         member this.Exec context =
             (
-                this.TurtleId |> Turtle.create context,
+                Turtle.create context this.TurtleId,
                 Seq.empty
             )
             |> Result.Ok
@@ -30,7 +30,7 @@ type TurnLeftCommand =
     {
         TurtleId: TurtleId
     }
-    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
+    interface IUpdateCommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context _ =
             seq {
@@ -45,7 +45,7 @@ type TurnRightCommand =
     {
         TurtleId: TurtleId
     }
-    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
+    interface IUpdateCommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context _ =
             seq {
@@ -60,7 +60,7 @@ type GoForwardsCommand =
     {
         TurtleId: TurtleId
     }
-    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
+    interface IUpdateCommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context state =
 
@@ -93,7 +93,7 @@ type SetVisibilityCommand =
         TurtleId: TurtleId
         IsVisible: bool
     }
-    interface ICommand<TurtleId, Turtle, TurtleEvent> with 
+    interface IUpdateCommand<TurtleId, Turtle, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context _ =
             seq {
@@ -103,3 +103,14 @@ type SetVisibilityCommand =
                 } |> TurtleEvent.VisibilitySet
             }
             |> Result.Ok
+
+//[<Route("/turtle/{TurtleId}/delete", HttpMethod.Post)>]
+//type DeleteCommand = 
+//    {
+//        TurtleId: TurtleId
+//    }
+//    interface IDeleteCommand<TurtleId, Turtle> with 
+//        member this.GetId context = this.TurtleId
+//        member this.Exec context _ =
+//            ()
+//            |> Result.Ok

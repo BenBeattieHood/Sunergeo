@@ -2,45 +2,82 @@
 
 type IEvent = interface end
 
-
-type EventSourceInitItem<'Id when 'Id : comparison> = 
-    {
-        Id: 'Id
-        CreatedOn: NodaTime.Instant
-    }
-    interface IEvent
-    
-type EventLogItem<'Id, 'Events when 'Id : comparison> = 
-    Init of EventSourceInitItem<'Id>
+type EventLogItemData<'Init, 'Events> = 
+    Init of 'Init
     | Event of 'Events
-
-
-type ICommandBase<'Id when 'Id : comparison> =
-    abstract GetId: Context -> 'Id
+    //| End of NodaTime.Instant
     
-type ICreateCommand<'Id, 'State, 'Event when 'Id : comparison> =
-    inherit ICommandBase<'Id>
-    abstract Exec: Context -> Result<'State * ('Event seq), Error>
+type EventLogItemMetadata<'AggregateId when 'AggregateId : comparison> = {
+    InstanceId: InstanceId
+    AggregateId: 'AggregateId
+    CorrelationId: CorrelationId
+    FromCorrelationId: CorrelationId option
+    Timestamp: NodaTime.Instant
+}
+type EventLogItem<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> = {
+    Metadata: EventLogItemMetadata<'AggregateId>
+    Data: EventLogItemData<'Init, 'Events>
+}
 
-type ICommand<'Id, 'State, 'Event when 'Id : comparison> =
-    inherit ICommandBase<'Id>
-    abstract Exec: Context -> 'State -> Result<'Event seq, Error>
+
+
+type ICommandBase<'AggregateId when 'AggregateId : comparison> =
+    abstract GetId: Context -> 'AggregateId
     
+type CreateCommandResult<'State, 'Events> = Result<'State * 'Events seq, Error>
+type CreateCommandExec<'State, 'Events> = Context -> CreateCommandResult<'State, 'Events>
+type ICreateCommand<'AggregateId, 'State, 'Events when 'AggregateId : comparison> =
+    inherit ICommandBase<'AggregateId>
+    abstract Exec: Context -> CreateCommandResult<'State, 'Events>
     
-type CommandResult<'State, 'Events> =
-    Create of ('State) * ('Events seq)
-    | Update of 'Events seq
+type UpdateCommandResult<'Events> = Result<'Events seq, Error>
+type UpdateCommandExec<'State, 'Events> = Context -> 'State -> UpdateCommandResult<'Events>
+type IUpdateCommand<'AggregateId, 'State, 'Events when 'AggregateId : comparison> =
+    inherit ICommandBase<'AggregateId>
+    abstract Exec: Context -> 'State -> UpdateCommandResult<'Events>
+    
+//type DeleteCommandResult = Result<unit, Error>
+//type DeleteCommandExec<'State> = Context -> 'State -> DeleteCommandResult
+//type IDeleteCommand<'AggregateId, 'State when 'AggregateId : comparison> =
+//    inherit ICommandBase<'AggregateId>
+//    abstract Exec: Context -> 'State -> DeleteCommandResult
+    
 
 
-type IQuery<'Id, 'ReadStore, 'Result when 'Id : comparison> =
-    abstract GetId: Context -> 'Id
-    abstract Exec: Context -> 'ReadStore -> Result<'Result, Error>
+type IQuery<'ReadStore, 'Result> =
+    abstract Exec: Context -> 'ReadStore -> Async<Result<'Result, Error>>
 
+
+type ShardId = string
+type ShardPartitionId = int
+type ShardPartitionPosition = int64
+type ShardPartition = {
+    ShardId: ShardId
+    ShardPartitionId: ShardPartitionId
+}
+
+
+type Snapshot<'State> = {
+    ShardPartition: ShardPartition
+    ShardPartitionPosition: ShardPartitionPosition
+    State: 'State
+}
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Snapshot =
+    let state
+        (snapshot: Snapshot<'State>)
+        :'State =
+        snapshot.State
 
 module Utils =    
-    let toTopic<'State>
+    let toShardId<'State>
         (instanceId: InstanceId)
-        :string = 
+        :ShardId = 
         sprintf "%s-%s" 
             (typeof<'State>.Name)
             (instanceId |> string)
+
+    let createCorrelationId
+        ()
+        :CorrelationId =
+        System.Guid.NewGuid().ToByteArray() |> CorrelationId

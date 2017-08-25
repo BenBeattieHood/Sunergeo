@@ -4,10 +4,13 @@
 open System
 open Sunergeo.Core
 open Sunergeo.EventSourcing
+open Sunergeo.EventSourcing.Memory
+open Sunergeo.EventSourcing.Storage
 open Sunergeo.KeyValueStorage
+open Sunergeo.KeyValueStorage.Memory
 open Sunergeo.Logging
 open Sunergeo.Projection
-open Sunergeo.Projection.Default
+open Sunergeo.Projection.Kafka
 open Sunergeo.Web
 open Sunergeo.Web.Commands
 open Sunergeo.Web.Queries
@@ -22,13 +25,83 @@ open Sunergeo.Examples.Turtle.Events
 open Sunergeo.Examples.Turtle.State
 open Sunergeo.Examples.Turtle.Aggregate
 open Sunergeo.Examples.Turtle.Commands
+open Sunergeo.Examples.Turtle.Queries
 open Microsoft.AspNetCore.Http
+open System.IO
+
+// nb https://github.com/aspnet/KestrelHttpServer/issues/1652#issuecomment-293224372
+
+let execCreateCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> ICreateCommand<'AggregateId, 'State, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
+    (eventStore: Sunergeo.EventSourcing.EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>)
+    (command: 'Command)
+    (context: Context)
+    (request: HttpRequest)
+    : Async<Result<unit, Error>> =
+    eventStore.Create
+        context
+        (command.GetId context)
+        command.Exec
+
+let execCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> IUpdateCommand<'AggregateId, 'State, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
+    (eventStore: Sunergeo.EventSourcing.EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>)
+    (command: 'Command)
+    (context: Context)
+    (request: HttpRequest)
+    : Async<Result<unit, Error>> =
+    eventStore.Append
+        context
+        (command.GetId context)
+        command.Exec
+
+//let execCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> IDeleteCommand<'AggregateId, 'State> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
+//    (eventStore: Sunergeo.EventSourcing.EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>)
+//    (command: 'Command)
+//    (context: Context)
+//    (request: HttpRequest)
+//    : Async<Result<unit, Error>> =
+//    eventStore.Delete
+//        context
+//        (command.GetId context)
+//        command.Exec
+
+let execQueryFor<'Query, 'ReadStore, 'Result when 'Query :> IQuery<'ReadStore, 'Result>>
+    (readStore: 'ReadStore)
+    (query: 'Query)
+    (context: Context)
+    (request: HttpRequest)
+    : Async<Result<'Result, Error>> =
+    query.Exec
+        context
+        readStore
+        
+        
+//let ofExecQuery<'Result>
+//    (execQuery: Context -> HttpRequest -> Async<Result<'Result option, Error>>)
+//    : Context -> HttpRequest -> Async<Result<obj option, Error>> =
+//    (fun (context: Context) (request: HttpRequest) ->
+//        async {
+//            let! result = execQuery context request
+//            return result |> (ResultModule.map << Option.map) (fun x -> x :> obj)
+//        }
+//    )
+let ofExecQuery<'Result>
+    (execQuery: Context -> HttpRequest -> Async<Result<'Result, Error>>)
+    : Context -> HttpRequest -> Async<Result<obj, Error>> =
+    (fun (context: Context) (request: HttpRequest) ->
+        async {
+            let! result = execQuery context request
+            return result |> ResultModule.map (fun x -> x :> obj)
+        }
+    )
 
 [<EntryPoint>]
 let main argv = 
     //let assemblies = [typeof<Turtle>.Assembly]
 
-    let instanceId:InstanceId = "123"
+    let instanceId:InstanceId = 123
+    let shardId =
+        instanceId
+        |> Utils.toShardId<Turtle>
 
     let logger =
         (fun (logLevel: LogLevel) (message: string) ->
@@ -38,40 +111,45 @@ let main argv =
     sprintf "Starting server..."
     |> Console.WriteLine
 
-    let snapshotStoreConfig:KeyValueStorageConfig = 
+    //let snapshotStoreConfig:KeyValueStoreConfig = 
+    //    {
+    //        Uri = Uri("localhost:3000")
+    //        Logger = logger
+    //        TableName = instanceId |> Utils.toShardId<Turtle>
+    //    }
+
+    let snapshotStore = new MemoryKeyValueStore<TurtleId, Snapshot<Turtle>>()
+
+    //sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
+    //|> Console.WriteLine
+    
+    let eventStoreImplementationConfig:MemoryEventStoreImplementationConfig<TurtleId, Turtle, MemoryKeyValueVersion> = 
         {
-            Uri = Uri("localhost:3000")
+            ShardId = shardId
             Logger = logger
-            TableName = instanceId |> Utils.toTopic<Turtle>
-        }
-
-    use snapshotStore = new KeyValueStore<TurtleId, Snapshot<Turtle>>(snapshotStoreConfig)
-
-    sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
-    |> Console.WriteLine
-
-    let eventSourceConfig:EventSourceConfig<TurtleId, Turtle, TurtleEvent> = 
-        {
-            InstanceId = instanceId
-            Fold = Turtle.fold
             SnapshotStore = snapshotStore
-            LogUri = Uri("localhost:9092")
+        }
+    let eventStoreImplementation = MemoryEventStoreImplementation<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventStoreImplementationConfig)
+
+    let eventSourceConfig:EventStoreConfig<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
+        {
+            CreateInit = (fun _ _ state -> ())
+            Fold = Turtle.fold
+            Implementation = eventStoreImplementation
             Logger = logger
         }
     
-    use eventSource = new Sunergeo.EventSourcing.EventSource<TurtleId, Turtle, TurtleEvent>(eventSourceConfig)
+    let eventStore = new Sunergeo.EventSourcing.EventStore<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventSourceConfig)
 
-    sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
-    |> Console.WriteLine
+    let execCreateCommand = execCreateCommandFor eventStore
+    let execCommand = execCommandFor eventStore
+
+    //sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
+    //|> Console.WriteLine
     
-//type RoutedType<'TargetType, 'Result> = {
-//    PathAndQuery: string
-//    HttpMethod: HttpMethod
-//    Exec: 'TargetType -> Microsoft.AspNetCore.Http.HttpRequest -> Result<'Result, Error>
-//}RoutedType<'Command, CommandResult<'State, 'Events>>
-
     let commandWebHostConfig:CommandWebHostConfig<TurtleId, State.Turtle, TurtleEvent> = 
         {
+            InstanceId = instanceId
             Logger = logger
             BaseUri = Uri("http://localhost:8080")
             Handlers = 
@@ -79,48 +157,27 @@ let main argv =
                     {
                         RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.PathAndQuery
                         RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<CreateCommand>).Value.HttpMethod
-                        RoutedCommand.Exec = 
-                            (fun (command: CreateCommand) (context: Context) (request: HttpRequest) ->
-                                (command :> ICreateCommand<TurtleId, Turtle, TurtleEvent>).Exec context
-                                |> (Result.map (fun x -> x |> CommandResult.Create))
-                            )
+                        RoutedCommand.Exec = (fun (x:CreateCommand) -> execCreateCommand x)
                     } |> Routing.createHandler
                     
-                    //{
-                    //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.PathAndQuery
-                    //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.HttpMethod
-                    //    RoutedCommand.Exec = 
-                    //        (fun (command: TurnLeftCommand) (context: Context) ->
-                    //            (command :> ICommand<TurtleId, Turtle, TurtleEvent>).Exec context
-                    //        )
-                    //} |> Routing.createHandler
+                    {
+                        RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.PathAndQuery
+                        RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnLeftCommand>).Value.HttpMethod
+                        RoutedCommand.Exec = (fun (x:TurnLeftCommand) -> execCommand (x :> IUpdateCommand<TurtleId, Turtle, TurtleEvent>))
+                    } |> Routing.createHandler
 
-                    //{
-                    //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.PathAndQuery
-                    //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.HttpMethod
-                    //    RoutedCommand.Exec = 
-                    //        (fun (command: TurnRightCommand) (context: Context) ->
-                    //            Sunergeo.Core.Todo.todo()
-                    //            //(command :> ICreateCommand).Exec context
-                    //        )
-                    //} |> Routing.createHandler
+                    {
+                        RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.PathAndQuery
+                        RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<TurnRightCommand>).Value.HttpMethod
+                        RoutedCommand.Exec =  (fun (x:TurnRightCommand) -> execCommand (x :> IUpdateCommand<TurtleId, Turtle, TurtleEvent>))
+                    } |> Routing.createHandler
 
-                    //{
-                    //    RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<MovedForwardsCommand>).Value.PathAndQuery
-                    //    RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<MovedForwardsCommand>).Value.HttpMethod
-                    //    RoutedCommand.Exec = 
-                    //        (fun (command: MovedForwardsCommand) (context: Context) ->
-                    //            Sunergeo.Core.Todo.todo()
-                    //            //(command :> ICreateCommand).Exec context
-                    //        )
-                    //} |> Routing.createHandler
+                    {
+                        RoutedCommand.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<GoForwardsCommand>).Value.PathAndQuery
+                        RoutedCommand.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<GoForwardsCommand>).Value.HttpMethod
+                        RoutedCommand.Exec =  (fun (x:GoForwardsCommand) -> execCommand (x :> IUpdateCommand<TurtleId, Turtle, TurtleEvent>))
+                    } |> Routing.createHandler
                 ]
-            OnHandle = 
-                (fun id context result ->
-                    eventSource.Exec(id, context, result, Turtle.fold)
-                    |> Async.RunSynchronously
-                    |> ResultModule.get
-                )
         }
 
     use commandWebHost = 
@@ -132,57 +189,126 @@ let main argv =
     |> Console.WriteLine
 
     
-    let readStoreConfig:KeyValueStorageConfig = 
+    //let readStoreConfig:KeyValueStoreConfig = 
+    //    {
+    //        Uri = Uri("localhost:3000")
+    //        Logger = logger
+    //        TableName = (instanceId |> Utils.toShardId<Turtle>) + "-ReadStore"
+    //    }
+    
+    let shardPartitionPositionStore = MemoryKeyValueStore<ShardPartition, ShardPartitionPosition>()
+    let readStore = MemoryKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>>()
+
+    // use akkaSignalr = Sunergeo.AkkaSignalr.Consumer.Program.StartAkkaAndSignalr()
+    
+    //let mutable pollPositionState:Map<TurtleId, int> = Map.empty
+    //let pollingActorConfig:Sunergeo.Projection.EventSourcePollingActorConfig<TurtleId, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
+    //    {
+    //        Logger = logger
+    //        EventSource = eventStoreImplementation :> Sunergeo.EventSourcing.Memory.IEventSource<TurtleId, Turtle, TurtleEvent>
+    //        GetPollPositionState =
+    //            (fun _ ->
+    //                async { return pollPositionState }
+    //            )
+    //        SetPollPositionState = 
+    //            (fun x ->
+    //                async { pollPositionState <- x }
+    //            )
+    //    }
+        //KafkaPollingActorConfig = 
+        //    {
+        //        KafkaUri = eventSourceConfig.LogUri
+        //        GroupId = instanceId |> Utils.toShardId<Turtle>
+        //        AutoCommitIntervalMs = 5000 |> Some
+        //        StatisticsIntervalMs = 60000
+        //        Servers = "localhost:9092"
+        //    }
+
+    let serializerConfig = 
+        Hyperion.SerializerOptions(
+            versionTolerance = true,
+            preserveObjectReferences = true,
+            surrogates = null,
+            serializerFactories = null,
+            knownTypes = null,
+            ignoreISerializable = true
+            )
+    let serializer = Hyperion.Serializer(serializerConfig)
+        
+    let projectorConfig:Sunergeo.Projection.KeyValueStorage.KeyValueProjectorConfig<TurtleId, TurtleInit, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion> =
         {
-            Uri = Uri("localhost:3000")
             Logger = logger
-            TableName = (instanceId |> Utils.toTopic<Turtle>) + "-ReadStore"
-        }   
+            KeyValueStore = readStore
+            CreateState = DefaultReadStore.create
+            Fold = DefaultReadStore.fold
+        }
+    let projectionHostConfig:KafkaProjectionHostConfig<TurtleId, TurtleInit, TurtleEvent, MemoryKeyValueVersion> = 
+        {
+            ProjectionHostId = sprintf "%s-projectionhost" shardId
+            Logger = logger
+            ShardPartitionPositionStore = shardPartitionPositionStore
+            Projectors =
+                [
+                    Sunergeo.Projection.KeyValueStorage.Implementation.keyValueProjector projectorConfig
+                ]
+            ProjectorsPerShardPartition = 5
+            KafkaConsumerConfig =
+                {
+                    Sunergeo.Kafka.KafkaConsumerConfig.Default with
+                        Sunergeo.Kafka.KafkaConsumerConfig.ClientId = sprintf "%s-projectionhost" shardId
+                }
+            ShardId = shardId
+            Deserialize = 
+                (fun bytes ->
+                    use stream = new MemoryStream(bytes)
+                    let result = stream |> serializer.Deserialize
+                    result :?> EventLogItem<TurtleId, TurtleInit, TurtleEvent>
+                )
+            //ActorConfig = 
+            //    {
+            //        Logger = logger
+            //        KeyValueStore = readStore
+            //        CreateState = DefaultReadStore.create
+            //        FoldState = DefaultReadStore.fold
+            //    }
+            //CreatePollingActor = 
+            //    (fun instanceId onEvent ->
+            //        EventSourcePollingActor(pollingActorConfig, instanceId, onEvent)
+            //    )
+        }
 
-    use akkaSignalr = Sunergeo.AkkaSignalr.Consumer.Program.StartAkkaAndSignalr()
+    use projectionHost = new KafkaProjectionHost<TurtleId, TurtleInit, TurtleEvent, MemoryKeyValueVersion>(projectionHostConfig)
         
-    let kafkaProjectionHostConfig:ProjectionHostConfig<KeyValueStorageProjectionConfig<TurtleId, DefaultReadStore.Turtle, TurtleEvent>, TurtleId> = {
-        Logger = logger
-        InstanceId = instanceId
-        KafkaUri = eventSourceConfig.LogUri
-        ActorConfig = 
-            {
-                Logger = logger
-                KeyValueStorageConfig = readStoreConfig
-                CreateState = DefaultReadStore.create
-                FoldState = DefaultReadStore.fold
-            }
-        KafkaPollingActorConfig = 
-            {
-                GroupId = "tuneup"
-                AutoCommitIntervalMs = 5000 |> Some
-                StatisticsIntervalMs = 60000
-                Servers = "localhost:9092"
-            }
-        GetPartitionId = string
-    }
+    let execQuery = execQueryFor (readStore :> IReadOnlyKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>, MemoryKeyValueVersion>)
+    
+    
+//type RoutedType<'HandlerType, 'Result> = {
+//    PathAndQuery: string
+//    HttpMethod: HttpMethod
+//    Exec: 'HandlerType -> Context -> HttpRequest -> Async<Result<'Result, Error>>
+//}
 
-    use kafkaProjectionHost = new KeyValueStoreProjectorHost<TurtleId, DefaultReadStore.Turtle, TurtleEvent>(kafkaProjectionHostConfig)
-        
+//type RoutedTypeRequestHandler<'Result> = 
+//    Context -> Microsoft.AspNetCore.Http.HttpRequest -> Option<unit -> Async<Result<'Result, Error>>>
+
 
     let queryWebHostConfig:QueryWebHostConfig = 
         {
+            InstanceId = instanceId
             Logger = logger
-            Queries = 
+            Handlers = 
                 [
+                    ({
+                        RoutedQuery.PathAndQuery = (Reflection.getAttribute<RouteAttribute> typeof<GetTurtle<_>>).Value.PathAndQuery
+                        RoutedQuery.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<GetTurtle<_>>).Value.HttpMethod
+                        RoutedQuery.Exec = 
+                            (fun (x:GetTurtle<_>) -> 
+                                execQuery (x :> IQuery<IReadOnlyKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>, _>, DefaultReadStore.Turtle option>) |> ofExecQuery
+                            )
+                    } : RoutedQuery<GetTurtle<_>>)
+                    |> Routing.createHandler<GetTurtle<_>, obj>
                 ]
-                |> List.map QueryWebHost.toGeneralRoutedQuery
             BaseUri = Uri("http://localhost:8081")
-            ContextProvider = 
-                (fun (httpContext:HttpContext) -> 
-                    Console.WriteLine("Called Context Provider...")
-                    {
-                        // TODO:
-                        Context.UserId = ""
-                        Context.WorkingAsUserId = ""
-                        Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)                        
-                    }
-                )
         }
 
     use queryWebHost =

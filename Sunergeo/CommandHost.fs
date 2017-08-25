@@ -21,7 +21,7 @@ type Config = {
 //                assembly.GetTypes()
 //                |> Seq.where
 //                    (fun t ->
-//                        t.IsAssignableFrom(typedefof<ICommand<_, _, _>>)
+//                        t.IsAssignableFrom(typedefof<IUpdateCommand<_, _, _>>)
 //                    )
 //            )
 //        |> List.ofSeq
