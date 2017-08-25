@@ -62,7 +62,12 @@ type Snapshot<'State> = {
     ShardPartitionPosition: ShardPartitionPosition
     State: 'State
 }
-
+[<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
+module Snapshot =
+    let state
+        (snapshot: Snapshot<'State>)
+        :'State =
+        snapshot.State
 
 module Utils =    
     let toShardId<'State>

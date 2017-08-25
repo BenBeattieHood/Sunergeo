@@ -133,8 +133,8 @@ type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVe
         
     let akkaConfigurationString = 
         Sunergeo.Akka.Configuration.ConfigurationBuilder.Create(
-            defaultSerializer = typeof<Hyperion.Serializer>,
-            byteArraySerializer = typeof<Hyperion.ValueSerializers.ByteArraySerializer>
+            defaultSerializer = typeof<Akka.Serialization.HyperionSerializer>,
+            byteArraySerializer = typeof<Akka.Serialization.ByteArraySerializer>
             )
 
     let akkaConfiguration = Akka.Configuration.ConfigurationFactory.ParseString(akkaConfigurationString)

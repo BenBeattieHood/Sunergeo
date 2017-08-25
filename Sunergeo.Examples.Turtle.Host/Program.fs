@@ -129,17 +129,17 @@ let main argv =
             Logger = logger
             SnapshotStore = snapshotStore
         }
-    let eventStoreImplementation = MemoryEventStoreImplementation<TurtleId, Turtle, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventStoreImplementationConfig)
+    let eventStoreImplementation = MemoryEventStoreImplementation<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventStoreImplementationConfig)
 
-    let eventSourceConfig:EventStoreConfig<TurtleId, Turtle, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
+    let eventSourceConfig:EventStoreConfig<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
         {
-            CreateInit = (fun _ _ state -> state)
+            CreateInit = (fun _ _ state -> ())
             Fold = Turtle.fold
             Implementation = eventStoreImplementation
             Logger = logger
         }
     
-    let eventStore = new Sunergeo.EventSourcing.EventStore<TurtleId, Turtle, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventSourceConfig)
+    let eventStore = new Sunergeo.EventSourcing.EventStore<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventSourceConfig)
 
     let execCreateCommand = execCreateCommandFor eventStore
     let execCommand = execCommandFor eventStore
@@ -149,6 +149,7 @@ let main argv =
     
     let commandWebHostConfig:CommandWebHostConfig<TurtleId, State.Turtle, TurtleEvent> = 
         {
+            InstanceId = instanceId
             Logger = logger
             BaseUri = Uri("http://localhost:8080")
             Handlers = 
@@ -234,21 +235,21 @@ let main argv =
             )
     let serializer = Hyperion.Serializer(serializerConfig)
         
-    let projectorConfig:Sunergeo.Projection.KeyValueStorage.KeyValueProjectorConfig<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion> =
+    let projectorConfig:Sunergeo.Projection.KeyValueStorage.KeyValueProjectorConfig<TurtleId, TurtleInit, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion> =
         {
             Logger = logger
             KeyValueStore = readStore
             CreateState = DefaultReadStore.create
             Fold = DefaultReadStore.fold
         }
-    let projectionHostConfig:KafkaProjectionHostConfig<TurtleId, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
+    let projectionHostConfig:KafkaProjectionHostConfig<TurtleId, TurtleInit, TurtleEvent, MemoryKeyValueVersion> = 
         {
             ProjectionHostId = sprintf "%s-projectionhost" shardId
             Logger = logger
             ShardPartitionPositionStore = shardPartitionPositionStore
             Projectors =
                 [
-                    Sunergeo.Projection.KeyValueStorage.keyValueProjector<TurtleId, Turtle, TurtleEvent, int>
+                    Sunergeo.Projection.KeyValueStorage.Implementation.keyValueProjector projectorConfig
                 ]
             ProjectorsPerShardPartition = 5
             KafkaConsumerConfig =
@@ -260,7 +261,8 @@ let main argv =
             Deserialize = 
                 (fun bytes ->
                     use stream = new MemoryStream(bytes)
-                    stream |> serializer.Deserialize
+                    let result = stream |> serializer.Deserialize
+                    result :?> EventLogItem<TurtleId, TurtleInit, TurtleEvent>
                 )
             //ActorConfig = 
             //    {
@@ -275,9 +277,9 @@ let main argv =
             //    )
         }
 
-    use projectionHost = new KeyValueStoreProjectorHost<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion, EventSourcePollingActor<TurtleId, Turtle, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion>>(projectionHostConfig)
+    use projectionHost = new KafkaProjectionHost<TurtleId, TurtleInit, TurtleEvent, MemoryKeyValueVersion>(projectionHostConfig)
         
-    let execQuery = execQueryFor (readStore :> IReadOnlyKeyValueStore<TurtleId, DefaultReadStore.Turtle, _>)
+    let execQuery = execQueryFor (readStore :> IReadOnlyKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>, MemoryKeyValueVersion>)
     
     
 //type RoutedType<'HandlerType, 'Result> = {
@@ -292,6 +294,7 @@ let main argv =
 
     let queryWebHostConfig:QueryWebHostConfig = 
         {
+            InstanceId = instanceId
             Logger = logger
             Handlers = 
                 [
@@ -300,7 +303,7 @@ let main argv =
                         RoutedQuery.HttpMethod = (Reflection.getAttribute<RouteAttribute> typeof<GetTurtle<_>>).Value.HttpMethod
                         RoutedQuery.Exec = 
                             (fun (x:GetTurtle<_>) -> 
-                                execQuery (x :> IQuery<IReadOnlyKeyValueStore<TurtleId, DefaultReadStore.Turtle, _>, DefaultReadStore.Turtle option>) |> ofExecQuery
+                                execQuery (x :> IQuery<IReadOnlyKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>, _>, DefaultReadStore.Turtle option>) |> ofExecQuery
                             )
                     } : RoutedQuery<GetTurtle<_>>)
                     |> Routing.createHandler<GetTurtle<_>, obj>

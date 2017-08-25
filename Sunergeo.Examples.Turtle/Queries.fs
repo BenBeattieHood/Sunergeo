@@ -14,13 +14,13 @@ type GetTurtle<'KeyValueVersion when 'KeyValueVersion : comparison> =
     {
         TurtleId: TurtleId
     }
-    interface IQuery<IReadOnlyKeyValueStore<TurtleId, DefaultReadStore.Turtle, 'KeyValueVersion>, DefaultReadStore.Turtle option> with 
+    interface IQuery<IReadOnlyKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>, 'KeyValueVersion>, DefaultReadStore.Turtle option> with 
         member this.Exec context readStore =
             async {
                 return 
                     readStore.Get this.TurtleId
                     |> ResultModule.bimap
-                        (Option.map fst)
+                        (Option.map (fst >> Snapshot.state))
                         (function
                             | ReadError.Timeout -> "timeout" |> Error.InvalidOp
                             | ReadError.Error s -> s |> Error.InvalidOp

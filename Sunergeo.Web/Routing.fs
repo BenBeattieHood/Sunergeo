@@ -149,3 +149,23 @@ let createHandler<'TargetType, 'Result>
             else 
                 None
     )
+
+let defaultContextProvider
+    (instanceId: InstanceId)
+    (httpContext: Microsoft.AspNetCore.Http.HttpContext)
+    : Sunergeo.Core.Context =
+    let fromCorrelationId =
+        match "x-from-correlation-id" |> httpContext.Request.Headers.TryGetValue with
+        | true, values 
+            when values.Count > 0 && String.IsNullOrEmpty(values.[0]) = false -> 
+                let result = values.[0]
+                Some (CorrelationId(result))
+        | _ -> 
+                None
+    {
+        Context.InstanceId = instanceId
+        Context.UserId = Sunergeo.Core.Todo.todo()
+        Context.WorkingAsUserId = Sunergeo.Core.Todo.todo()
+        Context.FromCorrelationId = fromCorrelationId
+        Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)
+    }

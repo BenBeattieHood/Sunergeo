@@ -137,8 +137,8 @@ module KafkaProducerConfig =
                 |> String.concat ","
                 :> obj
 
-            "key.serializer", upcast "org.apache.kafka.common.serialization.StringSerializer"
-            "value.serializer", upcast "org.apache.kafka.common.serialization.StringSerializer"
+            //"key.serializer", upcast "org.apache.kafka.common.serialization.StringSerializer"
+            //"value.serializer", upcast "org.apache.kafka.common.serialization.StringSerializer"
 
             "acks", upcast (config.Acks |> KafkaProducerAcknowledgments.toString)
 

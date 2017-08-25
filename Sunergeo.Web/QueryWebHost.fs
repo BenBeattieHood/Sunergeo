@@ -66,6 +66,7 @@ type QueryWebHostStartup (config: QueryWebHostStartupConfig) =
         
 
 type QueryWebHostConfig = {
+    InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
     Handlers: QueryHandler list
     BaseUri: Uri
@@ -77,14 +78,7 @@ module QueryWebHost =
             {
                 QueryWebHostStartupConfig.Logger = config.Logger
                 QueryWebHostStartupConfig.Handlers = config.Handlers
-                QueryWebHostStartupConfig.ContextProvider = 
-                    (fun httpContext -> 
-                        {
-                            Context.UserId = Sunergeo.Core.Todo.todo()
-                            Context.WorkingAsUserId = ""
-                            Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)
-                        }
-                    )
+                QueryWebHostStartupConfig.ContextProvider = defaultContextProvider config.InstanceId
             }
 
         WebHostBuilder()

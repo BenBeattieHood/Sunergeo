@@ -38,3 +38,9 @@ type TurtleEvent =
     | TurnedRight of TurnedRightEvent
     | MovedForwards of MovedForwardsEvent
     | VisibilitySet of VisibilitySetEvent
+
+
+
+// Init
+
+type TurtleInit = unit

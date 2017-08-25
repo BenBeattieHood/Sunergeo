@@ -59,6 +59,7 @@ type CommandWebHostStartup<'AggregateId, 'State, 'Events when 'AggregateId : com
         app.Run(RequestDelegate(reqHandler))
 
 type CommandWebHostConfig<'AggregateId, 'State, 'Events> = {
+    InstanceId: InstanceId
     Logger: Sunergeo.Logging.Logger
     Handlers: CommandHandler list
     BaseUri: Uri
@@ -83,14 +84,7 @@ module CommandWebHost =
             {
                 Logger = config.Logger
                 Handlers = config.Handlers
-                ContextProvider = 
-                    (fun httpContext -> 
-                        {
-                            Context.UserId = Sunergeo.Core.Todo.todo()
-                            Context.WorkingAsUserId = ""
-                            Context.Timestamp = NodaTime.Instant.FromDateTimeUtc(DateTime.UtcNow)
-                        }
-                    )
+                ContextProvider = defaultContextProvider config.InstanceId
             }
 
         WebHostBuilder()

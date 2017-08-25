@@ -146,8 +146,8 @@ module KafkaConsumerConfig =
                 |> String.concat ","
                 :> obj
 
-            "key.deserializer", upcast "org.apache.kafka.common.serialization.StringSerializer"
-            "value.deserializer", upcast "org.apache.kafka.common.serialization.StringSerializer"
+            //"key.deserializer", upcast "org.apache.kafka.common.serialization.StringSerializer"
+            //"value.deserializer", upcast "org.apache.kafka.common.serialization.StringSerializer"
 
             "fetch.min.bytes", upcast config.FetchMinSize
 

@@ -453,8 +453,8 @@ akka {{
     # Entries for pluggable serializers and their bindings.
 
     serializers {{
-      object = ""{defaultSerializer.FullName}, {defaultSerializer.AssemblyQualifiedName}""
-      bytes = ""{byteArraySerializer.FullName}, {byteArraySerializer.AssemblyQualifiedName}""
+      object = ""{defaultSerializer.FullName}, {defaultSerializer.Assembly.GetName().Name}""
+      bytes = ""{byteArraySerializer.FullName}, {byteArraySerializer.Assembly.GetName().Name}""
     }}
  
     # Class to Serializer binding. You only need to specify the name of an
@@ -476,8 +476,8 @@ akka {{
     # and `ID` is globally unique serializer identifier number.
     # Identifier values from 0 to 40 are reserved for Akka internal usage.
     serialization-identifiers {{
-      ""{byteArraySerializer.FullName}, {byteArraySerializer.AssemblyQualifiedName}"" = 4
-      ""{defaultSerializer.FullName}, {defaultSerializer.AssemblyQualifiedName}"" = 1
+      ""{byteArraySerializer.FullName}, {byteArraySerializer.Assembly.GetName().Name}"" = 4
+      ""{defaultSerializer.FullName}, {defaultSerializer.Assembly.GetName().Name}"" = 1
     }}
 	
 	# extra settings that can be custom to a serializer implementation
