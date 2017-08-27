@@ -33,6 +33,7 @@ let routePathAndQueryToRegexString
                 sprintf "(?<%s>.+?)" name
             )
         )
+    |> sprintf "^%s$"
 
 
 let createUriPathOrQueryParamParser

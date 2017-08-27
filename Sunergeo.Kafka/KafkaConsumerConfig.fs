@@ -159,28 +159,28 @@ module KafkaConsumerConfig =
 
             "session.timeout.ms", upcast config.SessionTimeoutMs
 
-            "auto.offset.reset", upcast (config.OffsetAutoReset |> KafkaConsumerOffsetAutoReset.toString)
+            //"auto.offset.reset", upcast (config.OffsetAutoReset |> KafkaConsumerOffsetAutoReset.toString)
 
-            "connections.max.idle.ms", upcast config.ConnectionMaxIdleMs
+            //"connections.max.idle.ms", upcast config.ConnectionMaxIdleMs
 
             "enable.auto.commit", upcast config.AutoCommitEnabled
 
-            "exclude.internal.topics", upcast true
+            //"exclude.internal.topics", upcast true
 
-            "fetch.max.bytes", upcast config.FetchMaxSize
+            //"fetch.max.bytes", upcast config.FetchMaxSize
 
-            "isolation.level", upcast (config.IsolationLevel |> KafkaConsumerIsolationLevel.toString)
+            //"isolation.level", upcast (config.IsolationLevel |> KafkaConsumerIsolationLevel.toString)
 
-            "max.poll.interval.ms", upcast config.PollIntervalMaxMs
-            "max.poll.records", upcast config.PollRecordMaxCount
+            //"max.poll.interval.ms", upcast config.PollIntervalMaxMs
+            //"max.poll.records", upcast config.PollRecordMaxCount
 
-            "partition.assignment.strategy", upcast config.GroupPartitioner
+            //"partition.assignment.strategy", upcast config.GroupPartitioner
 
-            "receive.buffer.bytes", upcast config.ReceiveBufferSize
+            //"receive.buffer.bytes", upcast config.ReceiveBufferSize
 
             "request.timeout.ms", upcast config.RequestTimeoutMs
 
-            "send.buffer.bytes", upcast config.SendBufferSize
+            //"send.buffer.bytes", upcast config.SendBufferSize
 
             "auto.commit.interval.ms", upcast config.AutoCommitIntervalMs
 
@@ -188,12 +188,12 @@ module KafkaConsumerConfig =
 
             "client.id", upcast config.ClientId
 
-            "fetch.max.wait.ms", upcast config.FetchMaxWaitMs
+            //"fetch.max.wait.ms", upcast config.FetchMaxWaitMs
 
             "metadata.max.age.ms", upcast config.MetadataMaxAgeMs
 
-            "reconnect.backoff.max.ms", upcast config.ReconnectionBackoffMaxMs
-            "reconnect.backoff.ms", upcast config.ReconnectionBackoffMinMs
+            //"reconnect.backoff.max.ms", upcast config.ReconnectionBackoffMaxMs
+            //"reconnect.backoff.ms", upcast config.ReconnectionBackoffMinMs
 
             "retry.backoff.ms", upcast config.RetryBackoffMs
 

@@ -142,45 +142,50 @@ module KafkaProducerConfig =
 
             "acks", upcast (config.Acks |> KafkaProducerAcknowledgments.toString)
 
-            "buffer.memory", upcast config.BufferMemorySize
+            //"buffer.memory", upcast config.BufferMemorySize
 
-            "compression.type", upcast (config.Compression |> KafkaCompression.toString) 
+            //"compression.type", upcast (config.Compression |> KafkaCompression.toString) 
 
             "retries", upcast config.Retries
 
-            "batch.size", upcast config.BatchSize
+            //"batch.size", upcast config.BatchSize
 
             "client.id", upcast config.ClientId
 
-            "connections.max.idle.ms", upcast config.ConnectionMaxIdleMs
+            //"connections.max.idle.ms", upcast config.ConnectionMaxIdleMs
 
             "linger.ms", upcast config.LingerMs
 
-            "max.block.ms", upcast config.BlockMaxMs
+            //"max.block.ms", upcast config.BlockMaxMs
 
-            "max.request.size", upcast config.RequestMaxSize
+            //"max.request.size", upcast config.RequestMaxSize
 
-            "partitioner.class", upcast config.Partitioner
+            //"partitioner.class", upcast config.Partitioner    // default key-based partitioner is what we want anyway
 
-            "receive.buffer.bytes", upcast config.ReceiveBufferSize
+            //"receive.buffer.bytes", upcast config.ReceiveBufferSize
 
             "request.timeout.ms", upcast config.RequestTimeoutMs
 
-            "send.buffer.bytes", upcast config.SendBufferSize
+            //"send.buffer.bytes", upcast config.SendBufferSize
 
-            "enable.idempotence", upcast config.EnableIdempotence
+            //"enable.idempotence", upcast config.EnableIdempotence         // WARNING
 
             "max.in.flight.requests.per.connection", upcast config.InflightRequestsPerConnectionMax
 
             "metadata.max.age.ms", upcast config.MetadataAgeMaxMs
 
-            "reconnect.backoff.max.ms", upcast config.ReconnectBackoffMaxMs
-            "reconnect.backoff.ms", upcast config.ReconnectBackoffMinMs
+            //"reconnect.backoff.max.ms", upcast config.ReconnectBackoffMaxMs
+            //"reconnect.backoff.ms", upcast config.ReconnectBackoffMinMs
 
             "retry.backoff.ms", upcast config.RetryBackoffMs
 
-            "transaction.timeout.ms", upcast config.TransactionTimeoutMs
-            "transactional.id", upcast config.TransactionalId
+            //"transaction.timeout.ms", upcast config.TransactionTimeoutMs
+            //"transactional.id", upcast config.TransactionalId
+
+            //"default.topic.config", upcast 
+            //    [
+
+            //    ]
 
         ] : List<string * obj>)
         |> dict
