@@ -8,7 +8,7 @@ open Sunergeo.EventSourcing.Storage
 type EventStoreConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     Fold: 'State -> 'Events -> 'State
     Logger: Sunergeo.Logging.Logger
-    CreateInit: 'AggregateId -> Context -> 'State -> 'Init
+    Create: 'AggregateId -> 'Init -> 'State
     Implementation: IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>
 }
 
@@ -31,17 +31,22 @@ type EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Agg
             EventLogItem.Data = data
         }
 
-    member this.Create(context: Context) (aggregateId: 'AggregateId) (f: CreateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
+    member this.Create
+        (context: Context) 
+        (aggregateId: 'AggregateId) 
+        (f: CreateCommandExec<'Init, 'Events>)
+        : Async<Result<unit, Error>> =
+
         let apply
             (
-                (newState: 'State),
+                (init: 'Init),
                 (newEvents: 'Events seq)
             )
             =
             let newEvents = 
                 seq {
                     yield
-                        config.CreateInit aggregateId context newState
+                        init
                         |> EventLogItemData.Init
 
                     yield!
@@ -49,6 +54,10 @@ type EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Agg
                         |> Seq.map EventLogItemData.Event
                 }
                 |> Seq.map (toEventLogItem context aggregateId)
+
+            let newState =
+                init
+                |> config.Create aggregateId
 
             newState, newEvents, None
 
@@ -65,7 +74,12 @@ type EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'Agg
                     |> ResultModule.map apply
             )
 
-    member this.Append(context: Context) (aggregateId: 'AggregateId) (f: UpdateCommandExec<'State, 'Events>): Async<Result<unit, Error>> =
+    member this.Append
+        (context: Context) 
+        (aggregateId: 'AggregateId) 
+        (f: UpdateCommandExec<'State, 'Events>)
+        : Async<Result<unit, Error>> =
+
         let apply
             (snapshot: Snapshot<'State>)
             (newEvents: 'Events seq)

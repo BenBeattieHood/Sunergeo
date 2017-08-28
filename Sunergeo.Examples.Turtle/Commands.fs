@@ -16,11 +16,11 @@ type CreateCommand =
         [<GeneratedId()>] 
         TurtleId: TurtleId
     }
-    interface ICreateCommand<TurtleId, Turtle, TurtleEvent> with 
+    interface ICreateCommand<TurtleId, TurtleInit, TurtleEvent> with 
         member this.GetId context = this.TurtleId
         member this.Exec context =
             (
-                Turtle.create context this.TurtleId,
+                Turtle.createInit context this.TurtleId,
                 Seq.empty
             )
             |> Result.Ok

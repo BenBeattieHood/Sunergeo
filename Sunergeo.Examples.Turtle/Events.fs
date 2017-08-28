@@ -45,6 +45,6 @@ type TurtleEvent =
 
 type TurtleInit = {
     Direction: Direction
-    Position: Position list
+    Position: Position
     IsVisible: bool
 }

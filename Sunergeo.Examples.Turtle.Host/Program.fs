@@ -32,7 +32,7 @@ open Sunergeo.Kafka
 
 // nb https://github.com/aspnet/KestrelHttpServer/issues/1652#issuecomment-293224372
 
-let execCreateCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> ICreateCommand<'AggregateId, 'State, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
+let execCreateCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> ICreateCommand<'AggregateId, 'Init, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
     (eventStore: Sunergeo.EventSourcing.EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>)
     (command: 'Command)
     (context: Context)
@@ -178,7 +178,7 @@ let main argv =
 
     let eventSourceConfig:EventStoreConfig<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
         {
-            CreateInit = (fun _ _ state -> ())
+            Create = Turtle.create
             Fold = Turtle.fold
             Implementation = eventStoreImplementation
             Logger = logger

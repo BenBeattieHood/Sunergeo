@@ -9,15 +9,25 @@ open Sunergeo.Examples.Turtle.State
 
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module Turtle =
-    let create
+    let createInit
         (context: Context)
         (turtleId: TurtleId)
-        : Turtle =
+        : TurtleInit =
         {
-            TurtleId = turtleId
             Direction = Direction.North
             Position = { X = 0; Y = 0 }
             IsVisible = true
+        }
+
+    let create
+        (turtleId: TurtleId)
+        (turtleInit: TurtleInit)
+        : Turtle =
+        {
+            TurtleId = turtleId
+            Direction = turtleInit.Direction
+            Position = turtleInit.Position
+            IsVisible = turtleInit.IsVisible
         }
 
     let fold
