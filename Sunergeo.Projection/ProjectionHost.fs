@@ -75,6 +75,11 @@ type ProjectionHost<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVe
             )
         let actorId = sprintf "%s-%i-%i-%i-projector" shardPartition.ShardId shardPartition.ShardPartitionId projectionPartitionIndex projectionActorIndex
         let projectionActor = spawn actorSystem actorId projectionActorF
+        // if this doesn't work, then use
+        //let projectionActorProps = 
+        //    Akka.Actor.Props.Create(typeof<FoldingActor<'state, 'event>>, [| box initialState; box fold |])
+        //let projectionActor = 
+        //    actorSystem.ActorOf(projectionActorProps, actorId)
         projectionActor
 
     let createProjectionPartition

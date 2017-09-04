@@ -43,4 +43,8 @@ type TurtleEvent =
 
 // Init
 
-type TurtleInit = unit
+type TurtleInit = {
+    Direction: Direction
+    Position: Position
+    IsVisible: bool
+}

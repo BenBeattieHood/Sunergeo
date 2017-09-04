@@ -9,9 +9,7 @@ open Sunergeo.EventSourcing.Storage
 type KafkaEventStoreImplementationConfig<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion when 'AggregateId : comparison and 'KeyValueVersion : comparison> = {
     ShardId: ShardId
     Logger: Sunergeo.Logging.Logger
-    Implementation: IEventStoreImplementation<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>
     SnapshotStore: Sunergeo.KeyValueStorage.IKeyValueStore<'AggregateId, Snapshot<'State>, 'KeyValueVersion>
-    LogUri: Uri
     ProducerConfig: Sunergeo.Kafka.KafkaProducerConfig
     SerializeAggregateId: 'AggregateId -> byte[]
     SerializeItem: EventLogItem<'AggregateId, 'Init, 'Events> -> byte[]

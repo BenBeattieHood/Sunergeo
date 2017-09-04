@@ -4,7 +4,7 @@
 open System
 open Sunergeo.Core
 open Sunergeo.EventSourcing
-open Sunergeo.EventSourcing.Memory
+open Sunergeo.EventSourcing.Kafka
 open Sunergeo.EventSourcing.Storage
 open Sunergeo.KeyValueStorage
 open Sunergeo.KeyValueStorage.Memory
@@ -28,10 +28,11 @@ open Sunergeo.Examples.Turtle.Commands
 open Sunergeo.Examples.Turtle.Queries
 open Microsoft.AspNetCore.Http
 open System.IO
+open Sunergeo.Kafka
 
 // nb https://github.com/aspnet/KestrelHttpServer/issues/1652#issuecomment-293224372
 
-let execCreateCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> ICreateCommand<'AggregateId, 'State, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
+let execCreateCommandFor<'AggregateId, 'Init, 'State, 'Events, 'Command, 'KeyValueVersion when 'Command :> ICreateCommand<'AggregateId, 'Init, 'Events> and 'AggregateId : comparison and 'KeyValueVersion : comparison>
     (eventStore: Sunergeo.EventSourcing.EventStore<'AggregateId, 'Init, 'State, 'Events, 'KeyValueVersion>)
     (command: 'Command)
     (context: Context)
@@ -103,6 +104,8 @@ let main argv =
         instanceId
         |> Utils.toShardId<Turtle>
 
+    let eventStoreShardId:ShardId = shardId
+
     let logger =
         (fun (logLevel: LogLevel) (message: string) ->
             Console.WriteLine (sprintf "%O: %s" logLevel message)
@@ -123,17 +126,59 @@ let main argv =
     //sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
     //|> Console.WriteLine
     
-    let eventStoreImplementationConfig:MemoryEventStoreImplementationConfig<TurtleId, Turtle, MemoryKeyValueVersion> = 
+    let eventStoreSerializerConfig = 
+        Hyperion.SerializerOptions(
+            versionTolerance = false,
+            preserveObjectReferences = false,
+            surrogates = null,
+            serializerFactories = null,
+            knownTypes = null,
+            ignoreISerializable = false
+            )
+    let eventStoreSerializer = Hyperion.Serializer(eventStoreSerializerConfig)
+    let serializeEventStoreData
+        (item: 'a)
+        :byte[] =
+        use stream = new MemoryStream()
+        do eventStoreSerializer.Serialize(item, stream)
+        stream.ToArray()
+
+    let deserializeEventStoreData
+        (bytes: byte[]) 
+        :'a =
+        use stream = new MemoryStream(bytes)
+        let result = stream |> eventStoreSerializer.Deserialize
+        result :?> 'a
+
+
+        
+    let eventStoreImplementationConfig:KafkaEventStoreImplementationConfig<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
         {
-            ShardId = shardId
+            ShardId = eventStoreShardId
             Logger = logger
             SnapshotStore = snapshotStore
+            ProducerConfig = 
+                {
+                    KafkaProducerConfig.Default with
+                        KafkaProducerConfig.BootstrapHosts =
+                            [
+                                { KafkaHost.Host = "localhost"; KafkaHost.Port = 9092 }
+                            ]
+                }
+            SerializeAggregateId = serializeEventStoreData
+            SerializeItem = serializeEventStoreData
         }
-    let eventStoreImplementation = MemoryEventStoreImplementation<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventStoreImplementationConfig)
+    use eventStoreImplementation = new KafkaEventStoreImplementation<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventStoreImplementationConfig)
+
+    sprintf "Connected to kafka (%O)" eventStoreImplementationConfig.ProducerConfig.BootstrapHosts
+    |> Console.WriteLine
+
+
+
 
     let eventSourceConfig:EventStoreConfig<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
         {
-            CreateInit = (fun _ _ state -> ())
+            Create = Turtle.create
             Fold = Turtle.fold
             Implementation = eventStoreImplementation
             Logger = logger
@@ -144,8 +189,10 @@ let main argv =
     let execCreateCommand = execCreateCommandFor eventStore
     let execCommand = execCommandFor eventStore
 
-    //sprintf "Connected to kafka : %O" eventSourceConfig.LogUri
-    //|> Console.WriteLine
+    sprintf "Initialized event store"
+    |> Console.WriteLine
+
+
     
     let commandWebHostConfig:CommandWebHostConfig<TurtleId, State.Turtle, TurtleEvent> = 
         {
@@ -199,42 +246,8 @@ let main argv =
     let shardPartitionPositionStore = MemoryKeyValueStore<ShardPartition, ShardPartitionPosition>()
     let readStore = MemoryKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>>()
 
-    // use akkaSignalr = Sunergeo.AkkaSignalr.Consumer.Program.StartAkkaAndSignalr()
-    
-    //let mutable pollPositionState:Map<TurtleId, int> = Map.empty
-    //let pollingActorConfig:Sunergeo.Projection.EventSourcePollingActorConfig<TurtleId, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
-    //    {
-    //        Logger = logger
-    //        EventSource = eventStoreImplementation :> Sunergeo.EventSourcing.Memory.IEventSource<TurtleId, Turtle, TurtleEvent>
-    //        GetPollPositionState =
-    //            (fun _ ->
-    //                async { return pollPositionState }
-    //            )
-    //        SetPollPositionState = 
-    //            (fun x ->
-    //                async { pollPositionState <- x }
-    //            )
-    //    }
-        //KafkaPollingActorConfig = 
-        //    {
-        //        KafkaUri = eventSourceConfig.LogUri
-        //        GroupId = instanceId |> Utils.toShardId<Turtle>
-        //        AutoCommitIntervalMs = 5000 |> Some
-        //        StatisticsIntervalMs = 60000
-        //        Servers = "localhost:9092"
-        //    }
 
-    let serializerConfig = 
-        Hyperion.SerializerOptions(
-            versionTolerance = true,
-            preserveObjectReferences = true,
-            surrogates = null,
-            serializerFactories = null,
-            knownTypes = null,
-            ignoreISerializable = true
-            )
-    let serializer = Hyperion.Serializer(serializerConfig)
-        
+
     let projectorConfig:Sunergeo.Projection.KeyValueStorage.KeyValueProjectorConfig<TurtleId, TurtleInit, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion> =
         {
             Logger = logger
@@ -255,43 +268,22 @@ let main argv =
             KafkaConsumerConfig =
                 {
                     Sunergeo.Kafka.KafkaConsumerConfig.Default with
-                        Sunergeo.Kafka.KafkaConsumerConfig.ClientId = sprintf "%s-projectionhost" shardId
+                        Sunergeo.Kafka.KafkaConsumerConfig.BootstrapHosts = eventStoreImplementationConfig.ProducerConfig.BootstrapHosts
+                        Sunergeo.Kafka.KafkaConsumerConfig.ClientId = sprintf "%s-projectionhost" shardId   // assuming one projection host per box
+                        Sunergeo.Kafka.KafkaConsumerConfig.GroupId = sprintf "%s-projectionhost" shardId
                 }
-            ShardId = shardId
-            Deserialize = 
-                (fun bytes ->
-                    use stream = new MemoryStream(bytes)
-                    let result = stream |> serializer.Deserialize
-                    result :?> EventLogItem<TurtleId, TurtleInit, TurtleEvent>
-                )
-            //ActorConfig = 
-            //    {
-            //        Logger = logger
-            //        KeyValueStore = readStore
-            //        CreateState = DefaultReadStore.create
-            //        FoldState = DefaultReadStore.fold
-            //    }
-            //CreatePollingActor = 
-            //    (fun instanceId onEvent ->
-            //        EventSourcePollingActor(pollingActorConfig, instanceId, onEvent)
-            //    )
+            ShardId = eventStoreShardId
+            Deserialize = deserializeEventStoreData
         }
 
     use projectionHost = new KafkaProjectionHost<TurtleId, TurtleInit, TurtleEvent, MemoryKeyValueVersion>(projectionHostConfig)
         
+    sprintf "Initialized projection host and connected to kafka"
+    |> Console.WriteLine
+
+
     let execQuery = execQueryFor (readStore :> IReadOnlyKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>, MemoryKeyValueVersion>)
     
-    
-//type RoutedType<'HandlerType, 'Result> = {
-//    PathAndQuery: string
-//    HttpMethod: HttpMethod
-//    Exec: 'HandlerType -> Context -> HttpRequest -> Async<Result<'Result, Error>>
-//}
-
-//type RoutedTypeRequestHandler<'Result> = 
-//    Context -> Microsoft.AspNetCore.Http.HttpRequest -> Option<unit -> Async<Result<'Result, Error>>>
-
-
     let queryWebHostConfig:QueryWebHostConfig = 
         {
             InstanceId = instanceId

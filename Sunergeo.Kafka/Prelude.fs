@@ -1,15 +1,15 @@
 ﻿namespace Sunergeo.Kafka
 
 type KafkaHost = {
-    url: string
-    port: int
+    Host: string
+    Port: int
 }
 [<CompilationRepresentation(CompilationRepresentationFlags.ModuleSuffix)>]
 module KafkaHost =
     let toString
         (x: KafkaHost)
         : string =
-        sprintf "%s:%i" x.url x.port
+        sprintf "%s:%i" x.Host x.Port
 
 
 type KafkaCompression =

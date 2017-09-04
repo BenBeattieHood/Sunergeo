@@ -18,11 +18,11 @@ type RoutedTypeRequestHandler<'Result> =
     Context -> Microsoft.AspNetCore.Http.HttpRequest -> Option<unit -> Async<Result<'Result, Error>>>
 
 
-let routePathAndQueryVariableRegex = Regex(@"\{(.+?)\}", RegexOptions.Compiled)
-let routePathAndQueryToRegexString
+let routePathVariableRegex = Regex(@"\{(.+?)\}", RegexOptions.Compiled)
+let routePathToRegexString
     (path: string)
     :string =
-    routePathAndQueryVariableRegex.Replace 
+    routePathVariableRegex.Replace 
         (
             path,
             (fun x ->
@@ -33,6 +33,7 @@ let routePathAndQueryToRegexString
                 sprintf "(?<%s>.+?)" name
             )
         )
+    |> sprintf "^%s$"
 
 
 let createUriPathOrQueryParamParser
@@ -53,100 +54,165 @@ let createUriPathOrQueryParamParser
 let createHandler<'TargetType, 'Result>
     (routedType: RoutedType<'TargetType, 'Result>)
     :RoutedTypeRequestHandler<'Result> =
-    let pathAndQueryRegexString = routedType.PathAndQuery |> routePathAndQueryToRegexString
-    let pathAndQueryRegex = Regex(pathAndQueryRegexString, RegexOptions.Compiled)
+    let routedTypePath, routedTypeQueryOption = 
+        let indexOfQuery = routedType.PathAndQuery.IndexOf('?')
+        if indexOfQuery >= 0 
+        then
+            routedType.PathAndQuery.Substring(0, indexOfQuery),
+            routedType.PathAndQuery.Substring(indexOfQuery + 1) |> Some
+        else
+            routedType.PathAndQuery,
+            None
+            
+    let requestPathRegexString = routedTypePath |> routePathToRegexString
+    let requestPathRegex = Regex(requestPathRegexString, RegexOptions.Compiled)
+
+    let requestPathRegexGroupNames = 
+        requestPathRegex.GetGroupNames()
+        |> Array.filter (fun x -> x <> "0") // filter out the default group name
+
+    let requestQueryParamNames =
+        match routedTypeQueryOption with
+        | Some routedTypeQuery ->
+            routedTypeQuery
+            |> Regex(@"(^|&)([^=]+)\b").Matches
+            |> Seq.cast<Match>
+            |> Seq.choose
+                (fun m ->
+                    if m.Captures.Count = 2
+                    then Some m.Captures.[2].Value
+                    else None
+                )
+            |> Array.ofSeq
+        | None ->
+            Array.empty
 
     let t = typeof<'TargetType>
     let ctor = t.GetConstructors().[0]      // assume a record type
     let ctorParams = ctor.GetParameters()
+    
+    let _ =
+        let isValidRequestParameter
+            (requestParameter: string)
+            : bool =
+            ctorParams
+            |> Array.exists
+                (fun ctorParam ->
+                    String.Equals(requestParameter, ctorParam.Name, StringComparison.InvariantCultureIgnoreCase)
+                )
 
-    let regexGroupNames = 
-        pathAndQueryRegex.GetGroupNames()
-        |> Array.filter (fun x -> x <> "0") // filter out the default group name
+        let unrecognisedRequestPathGroupNames =
+            requestPathRegexGroupNames 
+            |> Array.filter
+                (isValidRequestParameter >> not)
 
-    let ctorParamToPathAndQueryRegexMapping = 
-        regexGroupNames
+        if unrecognisedRequestPathGroupNames |> Array.length > 0 then
+            failwith (sprintf "Unknown route path parameters %A" requestPathRegexGroupNames)
+
+        let unrecognisedRequestQueryParamNames =
+            requestQueryParamNames
+            |> Array.filter
+                (isValidRequestParameter >> not)
+
+        if unrecognisedRequestQueryParamNames |> Array.length > 0 then
+            failwith (sprintf "Unknown route query parameter %A" unrecognisedRequestQueryParamNames)
+
+
+    let requestPathOptic
+        (ctorParamName: string)
+        (map: string -> obj)
+        (requestPathMatchGroupCollection: GroupCollection)
+        : obj option =
+        let group = requestPathMatchGroupCollection.Item(ctorParamName)
+
+        if group.Captures.Count = 1
+        then group.Value |> map |> Some
+        else None
+
+    let mapStringValues
+        (map: string -> obj)
+        (value: Microsoft.Extensions.Primitives.StringValues)
+        : obj = 
+        match value.ToArray() with
+        | [||] -> () :> obj
+        | [| item |] -> item |> map
+        | values -> upcast (values |> Array.map map)
+
+    let requestQueryParamOptic
+        (ctorParamName: string)
+        (map: string -> obj)
+        (request: HttpRequest)
+        : obj option =
+        if ctorParamName |> request.Query.ContainsKey
+        then 
+            request.Query.[ctorParamName]
+            |> mapStringValues map
+            |> Some
+        else 
+            None
+
+    let ctorParamOptics =
+        ctorParams
         |> Array.map
-            (fun regexGroupName ->
-                let ctorParamIndex =
-                    ctorParams
-                    |> Array.tryFindIndex
-                        (fun ctorParam ->   // will also validate that all regex params are covered
-                            String.Equals(regexGroupName, ctorParam.Name, StringComparison.InvariantCultureIgnoreCase)
-                        )
+            (fun ctorParam ->
+                let parser = createUriPathOrQueryParamParser ctorParam.ParameterType
+                
+                if requestPathRegexGroupNames |> Array.exists (fun x -> x = ctorParam.Name) 
+                then
+                    requestPathOptic ctorParam.Name parser
+                    |> (fun f x _ -> f x)
+                    
+                elif requestQueryParamNames |> Array.exists (fun x -> x = ctorParam.Name) 
+                then
+                    requestQueryParamOptic ctorParam.Name parser
+                    |> (fun f _ y -> f y)
 
-                match ctorParamIndex with
-                | Some ctorParamIndex ->
-                    let ctorParam = 
-                        ctorParams
-                        |> Array.item ctorParamIndex
-                            
-                    ctorParamIndex, (regexGroupName, ctorParam.ParameterType |> createUriPathOrQueryParamParser)
-                | None ->
-                    failwith (sprintf "Unknown route parameter {%s}" regexGroupName)
+                else 
+                    (fun 
+                        _
+                        request ->
+                        match requestQueryParamOptic ctorParam.Name parser request with
+                        | Some value -> value |> Some
+                        | None ->
+                            if ctorParam.Name |> request.Form.ContainsKey
+                            then
+                                request.Form.[ctorParam.Name]
+                                |> mapStringValues parser
+                                |> Some
+                            else None
+                    )
             )
-        |> Map.ofArray
             
     (fun (context: Context) (request: Microsoft.AspNetCore.Http.HttpRequest) ->
         
-        if (request.Method |> HttpMethod.fromString) <> routedType.HttpMethod
+        if (request.Method |> HttpMethod.fromString) <> routedType.HttpMethod || request.Path.HasValue = false
         then
             None
         else
-            let pathAndQueryRegexValues = 
-                pathAndQueryRegex.Match(request.Path + request.QueryString).Groups
-                
-            let pathAndQueryParams =
-                regexGroupNames
+            let requestPathRegexValues = 
+                requestPathRegex.Match(request.Path.Value).Groups
+
+            let requestCtorValues =
+                ctorParamOptics
                 |> Array.choose
-                    (fun regexGroupName ->
-                        let group = pathAndQueryRegexValues.Item(regexGroupName)
-                        if group.Captures.Count = 1
-                        then
-                            (regexGroupName, group.Value)
-                            |> Some
-                        else
-                            None
+                    (fun ctorParamOptic ->
+                        ctorParamOptic requestPathRegexValues request
                     )
-                |> Map.ofArray
 
-            if (pathAndQueryParams |> Map.count) = (ctorParamToPathAndQueryRegexMapping |> Map.count)
+            if requestCtorValues |> Array.length = ctorParams.Length
             then
-                let ctorParamValues =
-                    ctorParams
-                    |> Array.mapi
-                        (fun index ctorParam ->
-                            let ctorParamToPathAndQueryRegexGroupName =
-                                ctorParamToPathAndQueryRegexMapping
-                                |> Map.tryFind index
+                let targetActivator =
+                    Sunergeo.Core.Reflection.getActivator<'TargetType>
+                        ctor
+                        ctorParams
 
-                            match ctorParamToPathAndQueryRegexGroupName with
-                            | Some (ctorParamToPathAndQueryRegexGroupName, uriPathOrQueryParamParser) ->
-                                pathAndQueryParams
-                                |> Map.find ctorParamToPathAndQueryRegexGroupName
-                                |> uriPathOrQueryParamParser
-                                |> Some
-                            | None ->
-                                None    /// TODO
-                        )
-                    |> Array.choose id
-
-                if (ctorParamValues |> Array.length) = (ctorParams |> Array.length)
-                then
-                    let targetActivator =
-                        Sunergeo.Core.Reflection.getActivator<'TargetType>
-                            ctor
-                            ctorParams
-
-                    let target =
-                        ctorParamValues
-                        |> targetActivator.Invoke
+                let target =
+                    requestCtorValues
+                    |> targetActivator.Invoke
                         
-                    (fun _ -> routedType.Exec target context request)
-                    |> Some
-                else
-                    None
-            else 
+                (fun _ -> routedType.Exec target context request)
+                |> Some
+            else
                 None
     )
 

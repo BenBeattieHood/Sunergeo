@@ -29,7 +29,7 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.KeyValueStorage.Ae
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Kafka", "Sunergeo.Kafka\Sunergeo.Kafka.fsproj", "{27D7EE6A-9CA2-4D1C-B02C-C91AAC2EC0B5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sunergeo.Akka.Configuration", "Sunergeo.Akka.Configuration\Sunergeo.Akka.Configuration.csproj", "{71024061-D51D-42D2-B873-F168F7BCD577}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sunergeo.Akka", "Sunergeo.Akka.Configuration\Sunergeo.Akka.csproj", "{71024061-D51D-42D2-B873-F168F7BCD577}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Sunergeo.Projection.Kafka", "Sunergeo.Projection.Kafka\Sunergeo.Projection.Kafka.fsproj", "{D6C7D022-90C7-4AEF-8699-2C9712CF3BD1}"
 EndProject

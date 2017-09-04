@@ -24,11 +24,11 @@ type EventLogItem<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> =
 type ICommandBase<'AggregateId when 'AggregateId : comparison> =
     abstract GetId: Context -> 'AggregateId
     
-type CreateCommandResult<'State, 'Events> = Result<'State * 'Events seq, Error>
-type CreateCommandExec<'State, 'Events> = Context -> CreateCommandResult<'State, 'Events>
-type ICreateCommand<'AggregateId, 'State, 'Events when 'AggregateId : comparison> =
+type CreateCommandResult<'Init, 'Events> = Result<'Init * 'Events seq, Error>
+type CreateCommandExec<'Init, 'Events> = Context -> CreateCommandResult<'Init, 'Events>
+type ICreateCommand<'AggregateId, 'Init, 'Events when 'AggregateId : comparison> =
     inherit ICommandBase<'AggregateId>
-    abstract Exec: Context -> CreateCommandResult<'State, 'Events>
+    abstract Exec: Context -> CreateCommandResult<'Init, 'Events>
     
 type UpdateCommandResult<'Events> = Result<'Events seq, Error>
 type UpdateCommandExec<'State, 'Events> = Context -> 'State -> UpdateCommandResult<'Events>
