@@ -29,7 +29,9 @@ let routePathToRegexString
                 let name = 
                     if x.Value = "{_}" 
                     then x.Index |> string
-                    else x.Groups.[1].Value
+                    else 
+                        let result = x.Groups.[1].Value
+                        sprintf "%c%s" (result.Chars(0) |> Char.ToLowerInvariant) (result.Substring(1))
                 sprintf "(?<%s>.+?)" name
             )
         )
@@ -74,16 +76,8 @@ let createHandler<'TargetType, 'Result>
     let requestQueryParamNames =
         match routedTypeQueryOption with
         | Some routedTypeQuery ->
-            routedTypeQuery
-            |> Regex(@"(^|&)([^=]+)\b").Matches
-            |> Seq.cast<Match>
-            |> Seq.choose
-                (fun m ->
-                    if m.Captures.Count = 2
-                    then Some m.Captures.[2].Value
-                    else None
-                )
-            |> Array.ofSeq
+            routedTypeQuery.Split([| '&' |], StringSplitOptions.RemoveEmptyEntries)
+            |> Array.map (fun x -> x.Split([| '=' |], StringSplitOptions.RemoveEmptyEntries) |> Array.head)
         | None ->
             Array.empty
 
@@ -101,13 +95,19 @@ let createHandler<'TargetType, 'Result>
                     String.Equals(requestParameter, ctorParam.Name, StringComparison.InvariantCultureIgnoreCase)
                 )
 
+        let failRouteParam
+            (message: string)
+            =
+            failwith (sprintf "%O @ \"%s\": %s" routedType.HttpMethod routedType.PathAndQuery message)
+
         let unrecognisedRequestPathGroupNames =
             requestPathRegexGroupNames 
             |> Array.filter
                 (isValidRequestParameter >> not)
 
         if unrecognisedRequestPathGroupNames |> Array.length > 0 then
-            failwith (sprintf "Unknown route path parameters %A" requestPathRegexGroupNames)
+            sprintf "Unknown route path parameters %A" requestPathRegexGroupNames
+            |> failRouteParam
 
         let unrecognisedRequestQueryParamNames =
             requestQueryParamNames
@@ -115,8 +115,27 @@ let createHandler<'TargetType, 'Result>
                 (isValidRequestParameter >> not)
 
         if unrecognisedRequestQueryParamNames |> Array.length > 0 then
-            failwith (sprintf "Unknown route query parameter %A" unrecognisedRequestQueryParamNames)
+            sprintf "Unknown route query parameter %A" unrecognisedRequestQueryParamNames
+            |> failRouteParam
 
+        let duplicateRequestParamNames =
+            requestPathRegexGroupNames
+            |> Seq.append requestQueryParamNames
+            |> Seq.groupBy id
+            |> Seq.map snd
+            |> Seq.filter (fun x -> x |> Seq.length > 1)
+            |> Seq.map Seq.head
+
+        if duplicateRequestParamNames |> (not << Seq.isEmpty) then
+            sprintf "Duplicated query params: %A" duplicateRequestParamNames
+            |> failRouteParam
+
+    let stringEquals
+        (comparison: StringComparison)
+        (a: string)
+        (b: string)
+        : bool =
+        System.String.Equals(a, b, comparison)
 
     let requestPathOptic
         (ctorParamName: string)
@@ -157,12 +176,12 @@ let createHandler<'TargetType, 'Result>
             (fun ctorParam ->
                 let parser = createUriPathOrQueryParamParser ctorParam.ParameterType
                 
-                if requestPathRegexGroupNames |> Array.exists (fun x -> x = ctorParam.Name) 
+                if requestPathRegexGroupNames |> Array.exists (stringEquals StringComparison.InvariantCultureIgnoreCase ctorParam.Name) 
                 then
                     requestPathOptic ctorParam.Name parser
                     |> (fun f x _ -> f x)
                     
-                elif requestQueryParamNames |> Array.exists (fun x -> x = ctorParam.Name) 
+                elif requestQueryParamNames |> Array.exists (stringEquals StringComparison.InvariantCultureIgnoreCase ctorParam.Name) 
                 then
                     requestQueryParamOptic ctorParam.Name parser
                     |> (fun f _ y -> f y)
