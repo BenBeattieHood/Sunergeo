@@ -25,7 +25,7 @@ type CreateCommand =
             )
             |> Result.Ok
 
-[<Route("/turtle/{TurtleId}/turn-left", HttpMethod.Post)>]
+[<Route("/turtle/{TurtleId}/turn-left?test", HttpMethod.Post)>]
 type TurnLeftCommand = 
     {
         TurtleId: TurtleId
@@ -40,7 +40,7 @@ type TurnLeftCommand =
             }
             |> Result.Ok
             
-[<Route("/turtle/{TurtleId}/turn-right", HttpMethod.Post)>]
+[<Route("/turtle/{TurtleId}/turn-right?test=1", HttpMethod.Post)>]
 type TurnRightCommand = 
     {
         TurtleId: TurtleId
@@ -55,7 +55,7 @@ type TurnRightCommand =
             }
             |> Result.Ok
 
-[<Route("/turtle/{TurtleId}/go-forwards", HttpMethod.Post)>]
+[<Route("/turtle/{TurtleId}/go-forwards?test=2&bar", HttpMethod.Post)>]
 type GoForwardsCommand = 
     {
         TurtleId: TurtleId
@@ -87,7 +87,7 @@ type GoForwardsCommand =
                 |> Error.InvalidOp
                 |> Result.Error
             
-[<Route("/turtle/{TurtleId}/set-visibility/{IsVisible}", HttpMethod.Post)>]
+[<Route("/turtle/{TurtleId}/set-visibility/{IsVisible}?test=2&bar=3", HttpMethod.Post)>]
 type SetVisibilityCommand = 
     {
         TurtleId: TurtleId

@@ -104,7 +104,7 @@ let main argv =
         instanceId
         |> Utils.toShardId<Turtle>
 
-    let eventStoreShardId:ShardId = "uhpo-default1" // shardId
+    let eventStoreShardId:ShardId = shardId
 
     let logger =
         (fun (logLevel: LogLevel) (message: string) ->
@@ -162,7 +162,7 @@ let main argv =
                     KafkaProducerConfig.Default with
                         KafkaProducerConfig.BootstrapHosts =
                             [
-                                { KafkaHost.Host = "dogsled.srvs.cloudkafka.com"; KafkaHost.Port = 24 }
+                                { KafkaHost.Host = "localhost"; KafkaHost.Port = 9092 }
                             ]
                 }
             SerializeAggregateId = serializeEventStoreData
@@ -268,7 +268,8 @@ let main argv =
             KafkaConsumerConfig =
                 {
                     Sunergeo.Kafka.KafkaConsumerConfig.Default with
-                        Sunergeo.Kafka.KafkaConsumerConfig.ClientId = sprintf "%s-projectionhost" shardId   // assuming one host per box
+                        Sunergeo.Kafka.KafkaConsumerConfig.BootstrapHosts = eventStoreImplementationConfig.ProducerConfig.BootstrapHosts
+                        Sunergeo.Kafka.KafkaConsumerConfig.ClientId = sprintf "%s-projectionhost" shardId   // assuming one projection host per box
                         Sunergeo.Kafka.KafkaConsumerConfig.GroupId = sprintf "%s-projectionhost" shardId
                 }
             ShardId = eventStoreShardId
