@@ -47,7 +47,7 @@ module Implementation =
                                 Snapshot.ShardPartitionPosition = shardPartitionPosition
                                 Snapshot.State = newState
                             }
-                    elif snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition <= shardPartitionPosition
+                    elif snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition >= shardPartitionPosition
                     then
                         // replaying partition, but this is already projected
                         () |> Result.Ok
@@ -68,7 +68,7 @@ module Implementation =
                     if snapshot.ShardPartition <> shardPartition
                     then
                         sprintf "Partition has changed, projection needs to replay" |> WriteError.Error |> Result.Error
-                    elif snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition <= shardPartitionPosition
+                    elif snapshot.ShardPartition = shardPartition && snapshot.ShardPartitionPosition >= shardPartitionPosition
                     then
                         // replaying partition, but this is already projected
                         () |> Result.Ok

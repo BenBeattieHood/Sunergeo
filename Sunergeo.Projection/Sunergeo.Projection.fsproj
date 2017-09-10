@@ -62,13 +62,13 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Akka">
-      <HintPath>..\packages\Akka.1.3.0\lib\net45\Akka.dll</HintPath>
+      <HintPath>..\packages\Akka.1.3.1\lib\net45\Akka.dll</HintPath>
     </Reference>
     <Reference Include="Akka.FSharp">
       <HintPath>..\packages\Akka.FSharp.1.2.3\lib\net45\Akka.FSharp.dll</HintPath>
     </Reference>
     <Reference Include="Akka.Serialization.Hyperion">
-      <HintPath>..\packages\Akka.Serialization.Hyperion.1.3.0-beta50\lib\net45\Akka.Serialization.Hyperion.dll</HintPath>
+      <HintPath>..\packages\Akka.Serialization.Hyperion.1.3.1-beta52\lib\net45\Akka.Serialization.Hyperion.dll</HintPath>
     </Reference>
     <Reference Include="Confluent.Kafka">
       <HintPath>..\packages\Confluent.Kafka.0.11.0\lib\net46\Confluent.Kafka.dll</HintPath>

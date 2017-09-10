@@ -3,6 +3,17 @@
 open System
 open Sunergeo.KeyValueStorage
 
+type AerospikeHost = {
+    Host: string
+    Port: int
+}
+
+type AerospikeClientConfig = {
+    Host: AerospikeHost
+    Logger: Sunergeo.Logging.Logger
+    TableName: string
+}
+
 type AerospikeReadError =
     Timeout
     | Error of string
@@ -12,13 +23,15 @@ type AerospikeWriteError =
     | InvalidVersion
     | Error of String
 
+type AerospikeVersion = int
+
 // A TL;DR of write versions is here https://discuss.aerospike.com/t/locking-a-record-in-aerospike/2152/3
-type AerospikeClient(config: KeyValueStoreConfig) =
+type AerospikeClient(config: AerospikeClientConfig) =
    
     let valueColumnName = "value"
     let db = "test"
     
-    let client = new Aerospike.Client.AerospikeClient(config.Uri.Host, config.Uri.Port)
+    let client = new Aerospike.Client.AerospikeClient(config.Host.Host, config.Host.Port)
 
     let createKey 
         (key: string)
@@ -26,12 +39,12 @@ type AerospikeClient(config: KeyValueStoreConfig) =
         Aerospike.Client.Key(db, config.TableName, key)
 
     let createWritePolicy
-        (generation: int)
+        (generation: AerospikeVersion)
         (generationPolicy: Aerospike.Client.GenerationPolicy)
         :Aerospike.Client.WritePolicy =
         let writePolicy = Aerospike.Client.WritePolicy()
         writePolicy.generation <- generation
-        writePolicy.generationPolicy <- Aerospike.Client.GenerationPolicy.EXPECT_GEN_EQUAL
+        writePolicy.generationPolicy <- generationPolicy
         writePolicy
             
 
@@ -39,7 +52,7 @@ type AerospikeClient(config: KeyValueStoreConfig) =
         (
             key: string
         )
-        : Result<(string * int) option, AerospikeReadError> =
+        : Result<(string * AerospikeVersion) option, AerospikeReadError> =
         try  // (Database Table Row)
 
             let keySet = key |> createKey
@@ -83,7 +96,7 @@ type AerospikeClient(config: KeyValueStoreConfig) =
         (
             key: string,
             value: string,
-            version: int
+            version: AerospikeVersion
         )
         :Result<unit, AerospikeWriteError> =
         try
@@ -102,7 +115,7 @@ type AerospikeClient(config: KeyValueStoreConfig) =
     member this.Delete
         (
             key: string,
-            version: int
+            version: AerospikeVersion
         )
         :Result<unit, AerospikeWriteError> =
         try

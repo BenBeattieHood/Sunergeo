@@ -5,7 +5,7 @@ open Sunergeo.Core
 open Sunergeo.KeyValueStorage
 
 
-type AerospikeKeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValueStoreConfig) = 
+type AerospikeKeyValueStore<'Key, 'Value when 'Key : comparison>(config: AerospikeClientConfig) = 
 
     let innerStore = new AerospikeClient(config)
 
@@ -24,10 +24,10 @@ type AerospikeKeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValu
         | AerospikeWriteError.InvalidVersion -> WriteError.InvalidVersion
         | AerospikeWriteError.Error error -> WriteError.Error error
         
-    interface IKeyValueStore<'Key, 'Value, int> with
+    interface IKeyValueStore<'Key, 'Value, AerospikeVersion> with
         member this.Get
             (key: 'Key)
-            :Result<('Value * int) option, ReadError> = 
+            :Result<('Value * AerospikeVersion) option, ReadError> = 
                 let serializedKey = key |> KeyValueStoreModule.serialize
                 let serializedValueAndVersion = innerStore.Get serializedKey
             
@@ -61,7 +61,7 @@ type AerospikeKeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValu
     
         member this.Delete
             (key: 'Key)
-            (generation: int)
+            (generation: AerospikeVersion)
             :Result<unit, WriteError> =
                 let serializedKey =
                     key
@@ -74,7 +74,7 @@ type AerospikeKeyValueStore<'Key, 'Value when 'Key : comparison>(config: KeyValu
 
         member this.Put
             (key: 'Key)
-            (valueOverVersion: 'Value * int)
+            (valueOverVersion: 'Value * AerospikeVersion)
             :Result<unit, WriteError> =
                 let serializedKey =
                     key

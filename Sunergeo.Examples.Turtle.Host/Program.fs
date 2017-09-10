@@ -7,7 +7,7 @@ open Sunergeo.EventSourcing
 open Sunergeo.EventSourcing.Kafka
 open Sunergeo.EventSourcing.Storage
 open Sunergeo.KeyValueStorage
-open Sunergeo.KeyValueStorage.Memory
+open Sunergeo.KeyValueStorage.Aerospike
 open Sunergeo.Logging
 open Sunergeo.Projection
 open Sunergeo.Projection.Kafka
@@ -114,17 +114,21 @@ let main argv =
     sprintf "Starting server..."
     |> Console.WriteLine
 
-    //let snapshotStoreConfig:KeyValueStoreConfig = 
-    //    {
-    //        Uri = Uri("localhost:3000")
-    //        Logger = logger
-    //        TableName = instanceId |> Utils.toShardId<Turtle>
-    //    }
 
-    let snapshotStore = new MemoryKeyValueStore<TurtleId, Snapshot<Turtle>>()
 
-    //sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Uri
-    //|> Console.WriteLine
+    let snapshotStoreConfig:AerospikeClientConfig = 
+        {
+            Host = { AerospikeHost.Host = "localhost"; AerospikeHost.Port = 3000 }
+            Logger = logger
+            TableName = instanceId |> Utils.toShardId<Turtle>
+        }
+
+    use snapshotStore = new AerospikeKeyValueStore<TurtleId, Snapshot<Turtle>>(snapshotStoreConfig)
+
+    sprintf "Connected to snapshot store : %O" snapshotStoreConfig.Host
+    |> Console.WriteLine
+
+
     
     let eventStoreSerializerConfig = 
         Hyperion.SerializerOptions(
@@ -152,7 +156,7 @@ let main argv =
 
 
         
-    let eventStoreImplementationConfig:KafkaEventStoreImplementationConfig<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
+    let eventStoreImplementationConfig:KafkaEventStoreImplementationConfig<TurtleId, TurtleInit, Turtle, TurtleEvent, AerospikeVersion> = 
         {
             ShardId = eventStoreShardId
             Logger = logger
@@ -168,7 +172,7 @@ let main argv =
             SerializeAggregateId = serializeEventStoreData
             SerializeItem = serializeEventStoreData
         }
-    use eventStoreImplementation = new KafkaEventStoreImplementation<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventStoreImplementationConfig)
+    use eventStoreImplementation = new KafkaEventStoreImplementation<TurtleId, TurtleInit, Turtle, TurtleEvent, AerospikeVersion>(eventStoreImplementationConfig)
 
     sprintf "Connected to kafka (%O)" eventStoreImplementationConfig.ProducerConfig.BootstrapHosts
     |> Console.WriteLine
@@ -176,7 +180,7 @@ let main argv =
 
 
 
-    let eventSourceConfig:EventStoreConfig<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion> = 
+    let eventSourceConfig:EventStoreConfig<TurtleId, TurtleInit, Turtle, TurtleEvent, AerospikeVersion> = 
         {
             Create = Turtle.create
             Fold = Turtle.fold
@@ -184,7 +188,7 @@ let main argv =
             Logger = logger
         }
     
-    let eventStore = new Sunergeo.EventSourcing.EventStore<TurtleId, TurtleInit, Turtle, TurtleEvent, MemoryKeyValueVersion>(eventSourceConfig)
+    let eventStore = new Sunergeo.EventSourcing.EventStore<TurtleId, TurtleInit, Turtle, TurtleEvent, AerospikeVersion>(eventSourceConfig)
 
     let execCreateCommand = execCreateCommandFor eventStore
     let execCommand = execCommandFor eventStore
@@ -236,26 +240,42 @@ let main argv =
     |> Console.WriteLine
 
     
-    //let readStoreConfig:KeyValueStoreConfig = 
-    //    {
-    //        Uri = Uri("localhost:3000")
-    //        Logger = logger
-    //        TableName = (instanceId |> Utils.toShardId<Turtle>) + "-ReadStore"
-    //    }
+    let shardPartitionPositionReadStoreConfig:AerospikeClientConfig = 
+        {
+            Host = { AerospikeHost.Host = "localhost"; AerospikeHost.Port = 3000 }
+            Logger = logger
+            TableName = (instanceId |> Utils.toShardId<Turtle>) + "-Projection-ShardPartitionPositions"
+        }
+    use shardPartitionPositionStore = new AerospikeKeyValueStore<ShardPartition, ShardPartitionPosition>(shardPartitionPositionReadStoreConfig)
     
-    let shardPartitionPositionStore = MemoryKeyValueStore<ShardPartition, ShardPartitionPosition>()
-    let readStore = MemoryKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>>()
+    sprintf "Connected to projection bookmark store : %O" snapshotStoreConfig.Host
+    |> Console.WriteLine
+    
 
 
 
-    let projectorConfig:Sunergeo.Projection.KeyValueStorage.KeyValueProjectorConfig<TurtleId, TurtleInit, DefaultReadStore.Turtle, TurtleEvent, MemoryKeyValueVersion> =
+    let readStoreConfig:AerospikeClientConfig = 
+        {
+            Host = { AerospikeHost.Host = "localhost"; AerospikeHost.Port = 3000 }
+            Logger = logger
+            TableName = (instanceId |> Utils.toShardId<Turtle>) + "-ReadStore"
+        }
+    
+    use readStore = new AerospikeKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>>(readStoreConfig)
+    
+    sprintf "Connected to read store : %O" readStoreConfig.Host
+    |> Console.WriteLine
+    
+
+
+    let projectorConfig:Sunergeo.Projection.KeyValueStorage.KeyValueProjectorConfig<TurtleId, TurtleInit, DefaultReadStore.Turtle, TurtleEvent, AerospikeVersion> =
         {
             Logger = logger
             KeyValueStore = readStore
             CreateState = DefaultReadStore.create
             Fold = DefaultReadStore.fold
         }
-    let projectionHostConfig:KafkaProjectionHostConfig<TurtleId, TurtleInit, TurtleEvent, MemoryKeyValueVersion> = 
+    let projectionHostConfig:KafkaProjectionHostConfig<TurtleId, TurtleInit, TurtleEvent, AerospikeVersion> = 
         {
             ProjectionHostId = sprintf "%s-projectionhost" shardId
             Logger = logger
@@ -276,13 +296,13 @@ let main argv =
             Deserialize = deserializeEventStoreData
         }
 
-    use projectionHost = new KafkaProjectionHost<TurtleId, TurtleInit, TurtleEvent, MemoryKeyValueVersion>(projectionHostConfig)
+    use projectionHost = new KafkaProjectionHost<TurtleId, TurtleInit, TurtleEvent, AerospikeVersion>(projectionHostConfig)
         
     sprintf "Initialized projection host and connected to kafka"
     |> Console.WriteLine
 
 
-    let execQuery = execQueryFor (readStore :> IReadOnlyKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>, MemoryKeyValueVersion>)
+    let execQuery = execQueryFor (readStore :> IReadOnlyKeyValueStore<TurtleId, Snapshot<DefaultReadStore.Turtle>, AerospikeVersion>)
     
     let queryWebHostConfig:QueryWebHostConfig = 
         {
