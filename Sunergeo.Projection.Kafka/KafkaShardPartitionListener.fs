@@ -19,45 +19,38 @@ type KafkaShardPartitionListenerConfig<'AggregateId, 'Init, 'Events, 'ShardParti
 type KafkaShardPartitionListener<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion when 'AggregateId : comparison and 'ShardPartitionStoreKeyValueVersion : comparison>(config: KafkaShardPartitionListenerConfig<'AggregateId, 'Init, 'Events, 'ShardPartitionStoreKeyValueVersion>) =
     
     let kafkaConsumer = new Confluent.Kafka.Consumer(config.KafkaConsumerConfig |> KafkaConsumerConfig.toKafkaConfig)
+    
 
-    do kafkaConsumer.OnError.Add
-        (fun error ->
-            KafkaError.writeToLog config.Logger error
-        )
+    let assignKafkaPartitions
+        (topicPartitions: TopicPartition seq)
+        : unit =
+        let retainTopicPartitionsAndPositions:(ShardPartition * ShardPartitionPosition option) seq =
+            kafkaConsumer.Assignment
+            |> kafkaConsumer.Position
+            |> Seq.map
+                (fun x ->
+                    if x.Error.HasError
+                    then
+                        failwith "Cannot load offsets"
+                    else
+                        x.TopicPartition |> TopicPartition.toShardPartition,
+                        x.Offset.Value |> Some
+                )
 
-    do kafkaConsumer.OnConsumeError.Add
-        (fun message ->
-            KafkaError.writeToLog config.Logger message.Error
-        )
+        kafkaConsumer.Unassign()
 
-    do kafkaConsumer.OnPartitionsAssigned.Add
-        (fun topicPartitions ->
-            let retainTopicPartitionsAndPositions:(ShardPartition * ShardPartitionPosition option) seq =
-                kafkaConsumer.Assignment
-                |> kafkaConsumer.Position
-                |> Seq.map
-                    (fun x ->
-                        if x.Error.HasError
-                        then
-                            failwith "Cannot load offsets"
-                        else
-                            x.TopicPartition |> TopicPartition.toShardPartition,
-                            x.Offset.Value |> Some
-                    )
+        let shardPartitions =
+            topicPartitions
+            |> Seq.map TopicPartition.toShardPartition
 
-            kafkaConsumer.Unassign()
+        let shardPartitionsAndPositionsResult =
+            shardPartitions
+            |> Seq.map (fun a -> a |> config.ShardPartitionPositionStore.Get |> ResultModule.map (fun b -> a, b |> Option.map fst))
+            |> ResultModule.ofSeq
 
-            let shardPartitions =
-                topicPartitions
-                |> Seq.map TopicPartition.toShardPartition
-
-            let shardPartitionsAndPositionsResult =
-                shardPartitions
-                |> Seq.map (fun a -> a |> config.ShardPartitionPositionStore.Get |> ResultModule.map (fun b -> a, b |> Option.map fst))
-                |> ResultModule.ofSeq
-
-            match shardPartitionsAndPositionsResult with
-            | Result.Ok shardPartitionsAndPositions ->
+        match shardPartitionsAndPositionsResult with
+        | Result.Ok shardPartitionsAndPositions ->
+            let kafkaTopicPartitionOffsets =
                 shardPartitionsAndPositions
                 |> Seq.append retainTopicPartitionsAndPositions
                 |> Seq.map 
@@ -67,26 +60,34 @@ type KafkaShardPartitionListener<'AggregateId, 'Init, 'Events, 'ShardPartitionSt
                             (shardPartitionPosition |> Option.defaultValue (0 |> int64) |> Offset)
                             )
                     )
-                |> kafkaConsumer.Assign
-            | Result.Error error ->
-                failwith "Cannot load offsets"
-        )
+                |> List.ofSeq
 
-    do kafkaConsumer.OnPartitionsRevoked.Add
-        (fun topicPartitions ->
-            let removeTopicPartitions =
-                topicPartitions
-                |> Seq.map TopicPartition.toShardPartition
-                |> Set.ofSeq
-            let retainTopicPartitions =
-                kafkaConsumer.Assignment
-                |> Seq.map TopicPartition.toShardPartition
-                |> Seq.filter removeTopicPartitions.Contains
-            
-            retainTopicPartitions 
-            |> Seq.map TopicPartition.ofShardPartition 
+            kafkaTopicPartitionOffsets
             |> kafkaConsumer.Assign
-        )
+
+        | Result.Error error ->
+            failwith "Cannot load offsets"
+
+    let revokeKafkaPartitions
+        (topicPartitions: TopicPartition seq)
+        : unit =
+        let removeTopicPartitions =
+            topicPartitions
+            |> Seq.map TopicPartition.toShardPartition
+            |> Set.ofSeq
+        let retainTopicPartitions =
+            kafkaConsumer.Assignment
+            |> Seq.map TopicPartition.toShardPartition
+            |> Seq.filter removeTopicPartitions.Contains
+            
+        retainTopicPartitions 
+        |> Seq.map TopicPartition.ofShardPartition 
+        |> kafkaConsumer.Assign
+
+    do kafkaConsumer.OnError.Add (fun error -> KafkaError.writeToLog config.Logger error)
+    do kafkaConsumer.OnConsumeError.Add (fun message -> KafkaError.writeToLog config.Logger message.Error)
+    do kafkaConsumer.OnPartitionsAssigned.Add assignKafkaPartitions
+    do kafkaConsumer.OnPartitionsRevoked.Add revokeKafkaPartitions
 
     do kafkaConsumer.OnMessage.Add
         (fun message ->
@@ -98,6 +99,20 @@ type KafkaShardPartitionListener<'AggregateId, 'Init, 'Events, 'ShardPartitionSt
         )
     
     do kafkaConsumer.Subscribe [| config.ShardId |]
+    let kafkaTopicMetadata = kafkaConsumer.GetMetadata(false).Topics |> Seq.find (fun topic -> topic.Topic = config.ShardId)
+    do if kafkaTopicMetadata.Error.HasError 
+        then KafkaError.writeToLog config.Logger kafkaTopicMetadata.Error
+        else 
+            let kafkaTopicPartitions =
+                kafkaTopicMetadata.Partitions
+                |> Seq.map
+                    (fun partition ->
+                        TopicPartition(
+                            kafkaTopicMetadata.Topic,
+                            partition.PartitionId
+                            )
+                    )
+            assignKafkaPartitions kafkaTopicPartitions
 
     member this.Poll(duration: TimeSpan):unit =
         kafkaConsumer.Poll duration

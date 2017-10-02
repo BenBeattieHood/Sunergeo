@@ -8,7 +8,7 @@
 1. Open 'C:\dev\Kafka\kafka_2.11-0.11.0.0\config\server.properties' and set its value for "log.dirs" to "C:/dev/Kafka/kafka_2.11-0.11.0.0/kafka-logs"
 1. Run "C:\dev\Kafka\kafka_2.11-0.11.0.0\bin\windows\kafka-server-start.bat C:\dev\Kafka\kafka_2.11-0.11.0.0\config\server.properties"
 1. Use Kafka Tool (www.kafkatool.com/index.html) to connect to localhost:2181
-1. Create topics/partitions/etc
+1. Create topics/partitions/etc (https://www.pluralsight.com/courses/apache-kafka-getting-started if you're unsure about these)
 1. Connect Sunergeo
 
 For more info, see:

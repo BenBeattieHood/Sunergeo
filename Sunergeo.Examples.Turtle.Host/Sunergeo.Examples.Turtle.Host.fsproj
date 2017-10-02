@@ -64,7 +64,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Akka">
-      <HintPath>..\packages\Akka.1.3.0\lib\net45\Akka.dll</HintPath>
+      <HintPath>..\packages\Akka.1.3.1\lib\net45\Akka.dll</HintPath>
     </Reference>
     <Reference Include="Akka.FSharp">
       <HintPath>..\packages\Akka.FSharp.1.2.3\lib\net45\Akka.FSharp.dll</HintPath>
@@ -223,11 +223,6 @@
       <Project>{d054483f-9820-45c2-b52c-dce7894583b7}</Project>
       <Private>True</Private>
     </ProjectReference>
-    <ProjectReference Include="..\Sunergeo.AkkaSignalr.Consumer\Sunergeo.AkkaSignalr.Consumer.csproj">
-      <Name>Sunergeo.AkkaSignalr.Consumer</Name>
-      <Project>{72014ee3-9761-4333-96a2-cae649b2a8f5}</Project>
-      <Private>True</Private>
-    </ProjectReference>
     <ProjectReference Include="..\Sunergeo.Core\Sunergeo.Core.fsproj">
       <Name>Sunergeo.Core</Name>
       <Project>{7a2ead93-127d-4066-af91-bf528097cea9}</Project>
@@ -251,6 +246,11 @@
     <ProjectReference Include="..\Sunergeo.Kafka\Sunergeo.Kafka.fsproj">
       <Name>Sunergeo.Kafka</Name>
       <Project>{27d7ee6a-9ca2-4d1c-b02c-c91aac2ec0b5}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+    <ProjectReference Include="..\Sunergeo.KeyValueStorage.Aerospike\Sunergeo.KeyValueStorage.Aerospike.fsproj">
+      <Name>Sunergeo.KeyValueStorage.Aerospike</Name>
+      <Project>{8358d8a6-165b-403b-87d3-dc94baa55c0c}</Project>
       <Private>True</Private>
     </ProjectReference>
     <ProjectReference Include="..\Sunergeo.KeyValueStorage\Sunergeo.KeyValueStorage.fsproj">

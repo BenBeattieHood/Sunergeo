@@ -5,12 +5,6 @@ open System.IO
 open System.Runtime.Serialization.Json
 open System.Text
 
-type KeyValueStoreConfig = {
-    Uri: Uri
-    Logger: Sunergeo.Logging.Logger
-    TableName: string
-}
-
 type ReadError =
     Timeout
     | Error of string
